@@ -8,7 +8,7 @@ const program = new Command();
 program
   .name("huggingcode")
   .description("Интерактивный coding agent с удалёнными моделями Hugging Face")
-  .version("1.0.0")
+  .version("1.0.1")
   .option("--cwd <path>", "рабочий каталог проекта")
   .action(async (options) => {
     try {

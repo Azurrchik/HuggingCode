@@ -53,20 +53,37 @@ impl BridgeState {
                     PathBuf::from("node")
                 }
             });
-        let mut child = Command::new(node)
+        let mut bridge_command = Command::new(node);
+        bridge_command
             .arg(bridge)
             .current_dir(root)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(|error| {
-                format!("Не удалось запустить локальный HuggingCode bridge: {error}")
-            })?;
+            .stderr(Stdio::piped());
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            bridge_command.creation_flags(CREATE_NO_WINDOW);
+        }
+        let mut child = bridge_command.spawn().map_err(|error| {
+            format!("Не удалось запустить локальный HuggingCode bridge: {error}")
+        })?;
         let stdin = child.stdin.take().ok_or("Bridge stdin недоступен")?;
         let stdout = child.stdout.take().ok_or("Bridge stdout недоступен")?;
+        let stderr = child.stderr.take().ok_or("Bridge stderr недоступен")?;
         let pending: Pending = Arc::new(Mutex::new(HashMap::new()));
         let reader_pending = pending.clone();
+        let stderr_app = app.clone();
+
+        std::thread::spawn(move || {
+            for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+                let _ = stderr_app.emit(
+                    "agent:event",
+                    json!({ "type": "error", "content": format!("Desktop bridge: {line}") }),
+                );
+            }
+        });
 
         std::thread::spawn(move || {
             for line in BufReader::new(stdout).lines().map_while(Result::ok) {

@@ -1,6 +1,6 @@
 [package]
 name = "huggingcode-desktop"
-version = "1.0.0"
+version = "1.0.1"
 description = "HuggingCode Desktop"
 authors = ["Azurrchik"]
 edition = "2021"
