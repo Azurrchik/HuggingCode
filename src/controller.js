@@ -35,8 +35,10 @@ function shortToolEvent(event) {
 }
 
 export class HuggingController {
-  static async create({ token, workspaceRoot = process.cwd() }) {
+  static async create({ token, workspaceRoot = process.cwd(), provider, providerEndpoint } = {}) {
     const config = await getConfig();
+    if (provider) config.provider = provider;
+    if (providerEndpoint !== undefined) config.providerEndpoint = providerEndpoint;
     const workspace = await createWorkspace(workspaceRoot);
     const memory = await memoryFrom(workspace.root);
     const checkpoints = new CheckpointStore(workspace.root);
@@ -72,9 +74,13 @@ export class HuggingController {
   createAgent() {
     return new CodingAgent({
       token: this.token,
+      provider: this.config.provider,
+      providerEndpoint: this.config.providerEndpoint,
       model: this.config.model,
-      maxTokens: this.config.maxTokens,
-      reasoningEffort: this.config.reasoningEffort,
+      maxTokens: this.config.tokenMode === "economy" ? Math.min(this.config.maxTokens, 2048) : this.config.maxTokens,
+      reasoningEffort: this.config.tokenMode === "economy" && this.config.reasoningEffort !== "none" ? "minimal" : this.config.reasoningEffort,
+      tokenMode: this.config.tokenMode,
+      autoCompactThreshold: this.config.tokenMode === "economy" ? Math.min(this.config.autoCompactThreshold, 12_000) : this.config.autoCompactThreshold,
       permissionMode: this.runtimePermissionMode,
       workspace: this.workspace,
       memory: this.memory,
@@ -84,6 +90,12 @@ export class HuggingController {
   }
 
   async refreshModelCatalog({ silent = false } = {}) {
+    if (this.config.provider !== "huggingface") {
+      this.modelCatalog = [];
+      this.modelCatalogSource = "provider";
+      if (!silent) this.emit({ type: "notice", level: "info", content: `Для ${this.config.provider} укажите ID модели вручную или выберите его из каталога провайдера.` });
+      return this.modelCatalog;
+    }
     try {
       this.modelCatalog = await fetchModelCatalog(this.token);
       this.modelCatalogSource = "live";
@@ -165,9 +177,12 @@ export class HuggingController {
 
   getStatus({ busy = false, queueCount = 0, goal = "" } = {}) {
     return {
+      provider: this.config.provider,
+      providerEndpoint: this.config.providerEndpoint,
       model: this.config.model,
       mode: this.runtimePermissionMode,
       effort: this.config.reasoningEffort,
+      tokenMode: this.config.tokenMode,
       theme: this.config.theme,
       workspace: this.workspace.root,
       context: { ...this.agent.getContextStats(), threshold: this.config.autoCompactThreshold },
@@ -194,7 +209,8 @@ export class HuggingController {
     this.config = await updateConfig({ ...persistedPatch, ...(permissionMode ? { permissionMode } : {}) });
     if (permissionMode) this.runtimePermissionMode = this.config.permissionMode;
     this.agent.setModel(this.config.model);
-    this.agent.setReasoningEffort(this.config.reasoningEffort);
+    this.agent.setReasoningEffort(this.config.tokenMode === "economy" && this.config.reasoningEffort !== "none" ? "minimal" : this.config.reasoningEffort);
+    this.agent.setTokenMode(this.config.tokenMode, this.config.tokenMode === "economy" ? Math.min(this.config.autoCompactThreshold, 12_000) : this.config.autoCompactThreshold);
     this.agent.setPermissionMode(this.runtimePermissionMode);
     return this.config;
   }

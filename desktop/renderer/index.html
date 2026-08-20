@@ -12,37 +12,42 @@
     <section id="login" class="login hidden">
       <div class="login-card">
         <p class="eyebrow">HUGGINGCODE DESKTOP</p>
-        <h1>Подключите Hugging Face</h1>
-        <p>Токен нужен только для удалённых моделей Hugging Face. Он хранится через системное защищённое хранилище вашей ОС.</p>
-        <label for="token">Fine-grained token с правом Inference Providers</label>
-        <input id="token" type="password" autocomplete="off" placeholder="hf_…" />
-        <button id="login-button" class="primary">Подключить</button>
+        <h1>Подключите AI-провайдера</h1>
+        <p>Ключ хранится только в защищённом хранилище вашей ОС. HuggingCode не записывает API-ключи в проект или чат.</p>
+        <label for="login-provider">Провайдер</label>
+        <select id="login-provider"></select>
+        <label for="login-endpoint">API endpoint</label>
+        <input id="login-endpoint" autocomplete="off" placeholder="https://…/v1" />
+        <label for="token" id="login-token-label">API key</label>
+        <input id="token" type="password" autocomplete="off" placeholder="hf_… или ключ выбранного провайдера" />
+        <button id="login-button" class="primary">Подключить безопасно</button>
         <p id="login-status" class="muted"></p>
       </div>
     </section>
 
     <section id="workspace" class="workspace hidden">
       <header class="topbar">
-        <div class="brand"><span class="brand-mark">◈</span><strong>HuggingCode</strong><span id="model" class="muted"></span></div>
-        <div class="top-actions"><button id="workspace-button" class="ghost">Папка</button><button id="settings-button" class="ghost">Модель и тема</button><span id="mode" class="mode">manual</span></div>
+        <div class="brand"><span class="brand-mark">◈</span><strong>HuggingCode</strong><span id="provider" class="provider-pill">Hugging Face</span><span id="model" class="muted"></span></div>
+        <div class="top-actions"><button id="workspace-button" class="ghost">Папка</button><button id="settings-button" class="ghost">Модель, провайдер и тема</button><span id="mode" class="mode">manual</span></div>
       </header>
       <div class="session-row">
         <span id="workspace-path" class="muted">workspace</span>
         <span id="activity" class="activity">Готов к работе.</span>
+        <span id="token-mode" class="token-mode">balanced</span>
       </div>
       <nav class="tabs" aria-label="Режим просмотра">
         <button class="tab active" data-view="chat">Chat</button>
-        <button class="tab" data-view="trajectory">Trajectory</button>
+        <button class="tab" data-view="trajectory">Trajectory <span id="trajectory-count" class="tab-count">0</span></button>
         <div class="tab-spacer"></div>
-        <input id="search" class="search" placeholder="Поиск в Trajectory" />
+        <input id="search" class="search" placeholder="Поиск по шагам" />
       </nav>
       <section id="chat-view" class="view chat-view"></section>
       <section id="trajectory-view" class="view trajectory-view hidden"></section>
       <section id="approval" class="approval hidden"></section>
       <section id="settings" class="settings hidden"></section>
       <footer class="composer">
-        <textarea id="prompt" rows="3" placeholder="Опишите задачу. Chat покажет ответ, а Trajectory — последовательность наблюдаемых действий."></textarea>
-        <div class="composer-actions"><span class="muted">Ctrl+Enter отправить · Esc отменить</span><button id="send" class="primary">Отправить</button></div>
+        <textarea id="prompt" rows="3" placeholder="Опишите задачу. В Chat видны безопасные действия, в Trajectory — полная наблюдаемая последовательность шагов."></textarea>
+        <div class="composer-actions"><span class="muted">Ctrl+Enter отправить · Esc отменить · скрытые рассуждения не сохраняются</span><button id="send" class="primary">Отправить</button></div>
       </footer>
     </section>
   </main>

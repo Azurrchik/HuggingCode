@@ -1,7 +1,7 @@
 {
   "name": "huggingcode",
-  "version": "1.0.1",
-  "description": "Cross-platform Hugging Face coding agent with keyboard-first TUI, safe trajectory, secure token storage, and Tauri desktop app.",
+  "version": "1.1.0",
+  "description": "Cross-platform multi-provider coding agent with safe trajectory, secure key storage, token economy, and Tauri desktop app.",
   "type": "module",
   "bin": {
     "huggingcode": "./bin/huggingcode.js"
@@ -22,7 +22,7 @@
     "desktop:mac": "npm run desktop:prepare-runtime && tauri build --config desktop/tauri/tauri.conf.json --bundles app,dmg",
     "desktop:linux": "npm run desktop:prepare-runtime && tauri build --config desktop/tauri/tauri.conf.json --bundles appimage,deb",
     "test": "node --test",
-    "lint": "node --check ./bin/huggingcode.js && node --check ./src/platform.js && node --check ./src/update-check.js && node --check ./src/command-catalog.js && node --check ./src/storage.js && node --check ./src/config.js && node --check ./src/permissions.js && node --check ./src/model-catalog.js && node --check ./src/session-store.js && node --check ./src/skills.js && node --check ./src/tasks.js && node --check ./src/workspace.js && node --check ./src/agent.js && node --check ./src/checkpoints.js && node --check ./src/verification.js && node --check ./src/controller.js && node --check ./src/tui/transcript.js && node --check ./src/tui/theme.js && node --check ./src/tui/HeaderBar.js && node --check ./src/tui/FooterBar.js && node --check ./src/tui/TranscriptView.js && node --check ./src/tui/StatusBar.js && node --check ./src/tui/PromptInput.js && node --check ./src/tui/PermissionCard.js && node --check ./src/tui/ModelPicker.js && node --check ./src/tui/CommandPalette.js && node --check ./src/tui/FullModeDialog.js && node --check ./src/tui/ThemePicker.js && node --check ./src/tui/TrajectoryView.js && node --check ./src/tui/App.js && node --check ./src/tui/start.js && node --check ./desktop/tauri-bridge.js && node --check ./desktop/prepare-runtime.mjs && node --check ./desktop/renderer/renderer.js",
+    "lint": "node --check ./bin/huggingcode.js && node --check ./src/platform.js && node --check ./src/update-check.js && node --check ./src/command-catalog.js && node --check ./src/storage.js && node --check ./src/config.js && node --check ./src/permissions.js && node --check ./src/model-catalog.js && node --check ./src/providers.js && node --check ./src/session-store.js && node --check ./src/skills.js && node --check ./src/tasks.js && node --check ./src/workspace.js && node --check ./src/agent.js && node --check ./src/checkpoints.js && node --check ./src/verification.js && node --check ./src/controller.js && node --check ./src/tui/transcript.js && node --check ./src/tui/theme.js && node --check ./src/tui/HeaderBar.js && node --check ./src/tui/FooterBar.js && node --check ./src/tui/TranscriptView.js && node --check ./src/tui/StatusBar.js && node --check ./src/tui/PromptInput.js && node --check ./src/tui/PermissionCard.js && node --check ./src/tui/ModelPicker.js && node --check ./src/tui/CommandPalette.js && node --check ./src/tui/FullModeDialog.js && node --check ./src/tui/ThemePicker.js && node --check ./src/tui/TrajectoryView.js && node --check ./src/tui/App.js && node --check ./src/tui/start.js && node --check ./desktop/tauri-bridge.js && node --check ./desktop/prepare-runtime.mjs && node --check ./desktop/renderer/renderer.js",
     "prepublishOnly": "npm run lint && npm test"
   },
   "publishConfig": {
@@ -41,6 +41,8 @@
     "coding-agent",
     "huggingface",
     "inference-providers",
+    "openai-compatible",
+    "openrouter",
     "ai",
     "developer-tools",
     "tauri",

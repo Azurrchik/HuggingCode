@@ -1,20 +1,23 @@
-import { InferenceClient } from "@huggingface/inference";
+import { createProviderClient, providerPreset } from "./providers.js";
 
 const MAX_TOOL_ROUNDS = 20;
 
-function buildSystemPrompt({ memory = "", permissionMode = "manual", roots = [] } = {}) {
+function buildSystemPrompt({ memory = "", permissionMode = "manual", roots = [], tokenMode = "balanced" } = {}) {
   const rootsText = roots.map((entry) => `${entry.primary ? "workspace" : `@${entry.id}`}: ${entry.root}`).join("\n") || "workspace: current directory";
   const modeRule = permissionMode === "plan"
     ? "You are in PLAN MODE. Explore and explain, but do not request write_file, replace_in_file, delete_file, or run_command. Produce a concrete checklist and wait for the user to switch modes before implementation."
     : "The host enforces permission rules for every write, deletion, and command. Explain impactful work briefly before requesting a tool.";
+  const memoryLimit = tokenMode === "economy" ? 3_500 : 12_000;
+  const economyRule = tokenMode === "economy" ? "Use concise tool inputs and answers. Reuse known workspace facts; avoid repeating long file contents." : "";
   return `You are HuggingCode, a careful terminal coding assistant.
 You work only inside the trusted roots shown below. Your task is to help the user understand, change, and verify code.
 Trusted roots:\n${rootsText}
 Use the available tools when you need actual workspace information. Never invent file contents, command results, or completed changes.
 Never ask for, expose, or write credentials, API keys, tokens, .env files, or other secrets. Do not attempt to access files outside the trusted roots.
 ${modeRule}
+${economyRule}
 Keep answers concise and practical. Summarize files changed and commands executed after you finish.
-${memory ? `\nProject memory (follow it unless it conflicts with safety):\n${memory.slice(0, 12_000)}` : ""}`;
+${memory ? `\nProject memory (follow it unless it conflicts with safety):\n${memory.slice(0, memoryLimit)}` : ""}`;
 }
 
 function getTextContent(content) {
@@ -31,15 +34,16 @@ function estimateTokens(value) {
   return Math.ceil(String(value || "").length / 4);
 }
 
-function formatModelError(error) {
+function formatModelError(error, provider = "huggingface") {
   if (error?.name === "AbortError") return "Запрос отменён.";
+  const label = providerPreset(provider).label;
   const status = error?.response?.status ?? error?.status;
-  if (status === 401) return "Hugging Face не принял токен. Выполните /login и вставьте новый токен с правом Inference Providers.";
-  if (status === 402) return "Недостаточно кредитов или не настроена оплата в Hugging Face. Выберите другую доступную модель или проверьте биллинг аккаунта.";
-  if (status === 403) return "Токен не имеет доступа к этой модели или к Inference Providers. Проверьте права токена и доступ к модели.";
-  if (status === 404) return "Модель или провайдер недоступны. Выполните /model и выберите поддерживаемую модель.";
-  if (status === 429) return "Превышен лимит запросов Hugging Face. Подождите и повторите попытку.";
-  return `Ошибка Hugging Face: ${error?.message || "неизвестная ошибка"}`;
+  if (status === 401) return `${label} не принял ключ. Проверьте выбранного провайдера и API key.`;
+  if (status === 402) return `Недостаточно кредитов или не настроена оплата у ${label}.`;
+  if (status === 403) return `Ключ не имеет доступа к модели или провайдеру ${label}.`;
+  if (status === 404) return "Модель или endpoint недоступны. Проверьте модель и настройки провайдера.";
+  if (status === 429) return `${label} временно ограничил запросы. Подождите и повторите попытку.`;
+  return `Ошибка ${label}: ${error?.message || "неизвестная ошибка"}`;
 }
 
 function requestAbortError() {
@@ -73,11 +77,15 @@ export async function verifyHuggingFaceToken(token) {
 }
 
 export class CodingAgent {
-  constructor({ token, model, maxTokens, reasoningEffort = "auto", permissionMode = "manual", workspace, approve, onEvent, memory = "" }) {
-    this.client = new InferenceClient(token);
+  constructor({ token, provider = "huggingface", providerEndpoint = "", model, maxTokens, reasoningEffort = "auto", permissionMode = "manual", tokenMode = "balanced", autoCompactThreshold = 48_000, workspace, approve, onEvent, memory = "" }) {
+    this.provider = provider;
+    this.providerEndpoint = providerEndpoint;
+    this.client = createProviderClient({ provider, endpoint: providerEndpoint, token });
     this.model = model;
     this.maxTokens = maxTokens;
     this.reasoningEffort = reasoningEffort;
+    this.tokenMode = tokenMode;
+    this.autoCompactThreshold = autoCompactThreshold;
     this.permissionMode = permissionMode;
     this.workspace = workspace;
     this.approve = approve;
@@ -88,7 +96,7 @@ export class CodingAgent {
   }
 
   getPromptState() {
-    return { memory: this.memory, permissionMode: this.permissionMode, roots: this.workspace.listRoots() };
+    return { memory: this.memory, permissionMode: this.permissionMode, roots: this.workspace.listRoots(), tokenMode: this.tokenMode };
   }
 
   refreshSystemPrompt() {
@@ -97,6 +105,7 @@ export class CodingAgent {
 
   setModel(model) { this.model = model; }
   setReasoningEffort(reasoningEffort) { this.reasoningEffort = reasoningEffort; }
+  setTokenMode(tokenMode, autoCompactThreshold) { this.tokenMode = tokenMode; this.autoCompactThreshold = autoCompactThreshold; this.refreshSystemPrompt(); }
   setPermissionMode(permissionMode) { this.permissionMode = permissionMode; this.refreshSystemPrompt(); }
   setMemory(memory) { this.memory = memory || ""; this.refreshSystemPrompt(); }
   reset() { this.messages = [{ role: "system", content: buildSystemPrompt(this.getPromptState()) }]; }
@@ -156,10 +165,10 @@ export class CodingAgent {
           return completion;
         } catch (fallbackError) {
           if (signal?.aborted || fallbackError?.name === "AbortError") throw requestAbortError();
-          throw new Error(formatModelError(fallbackError));
+          throw new Error(formatModelError(fallbackError, this.provider));
         }
       }
-      throw new Error(formatModelError(error));
+      throw new Error(formatModelError(error, this.provider));
     }
   }
 
@@ -194,7 +203,7 @@ export class CodingAgent {
       return { choices: [{ message: response }], usage, analysisObserved };
     } catch (error) {
       if (signal?.aborted || error?.name === "AbortError") throw requestAbortError();
-      if (emitted) throw new Error(formatModelError(error));
+      if (emitted) throw new Error(formatModelError(error, this.provider));
       this.onEvent({ type: "warning", content: "Провайдер не поддержал streaming; ответ будет получен обычным запросом." });
       return this.requestCompletion(messages, tools, signal);
     }
@@ -202,6 +211,10 @@ export class CodingAgent {
 
   async ask(userMessage, { signal, stream = true } = {}) {
     if (signal?.aborted) throw requestAbortError();
+    if (this.tokenMode === "economy" && this.getContextStats().estimatedTokens >= this.autoCompactThreshold) {
+      this.onEvent({ type: "warning", content: "Экономия токенов: сжимаю историю перед новым шагом." });
+      await this.compact("Keep only decisions, changed files, checks and unresolved tasks.", { signal });
+    }
     this.messages.push({ role: "user", content: userMessage });
     for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
       if (signal?.aborted) throw requestAbortError();
