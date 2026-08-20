@@ -16,21 +16,40 @@
 
 ## Установка и запуск
 
-Требуются **Windows**, Node.js **20+**, npm и Hugging Face account. Hugging Face предоставляет единый маршрутизатор для удалённых моделей и JavaScript-клиент для chat completion.[1]
+Требуются **Windows**, Node.js **20+**, npm и аккаунт Hugging Face. Hugging Face предоставляет единый маршрутизатор для удалённых моделей и JavaScript-клиент для chat completion.[1]
+
+### Вариант 1 — установить через npm (рекомендуется)
+
+Этот способ не требует вручную скачивать или клонировать GitHub-репозиторий. Команда устанавливается в систему и запускается из любой папки:
 
 ```powershell
-cd C:\Users\nesme\Desktop\HuggingCode
+npm install --global huggingcode
+huggingcode
+```
+
+### Вариант 2 — разовый запуск через npx
+
+Подходит, если не хочется выполнять глобальную установку. npm автоматически загрузит текущую публичную версию и запустит её:
+
+```powershell
+npx huggingcode
+```
+
+### Вариант 3 — запустить из исходного кода GitHub
+
+Этот вариант нужен разработчикам: чтобы изучать код, вносить изменения или запускать свою локальную версию.
+
+```powershell
+git clone https://github.com/Azurrchik/HuggingCode.git
+cd HuggingCode
 npm install
 npm start
 ```
 
-Для команды из любой папки привяжите пакет один раз:
+Чтобы сделать локальную копию глобальной командой во время разработки, выполните из папки проекта:
 
 ```powershell
-cd C:\Users\nesme\Desktop\HuggingCode
 npm link
-
-cd C:\path\to\your\project
 huggingcode
 ```
 
