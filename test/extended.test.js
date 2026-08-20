@@ -12,7 +12,7 @@ async function withDirectory(prefix, run) {
   try {
     await run(directory);
   } finally {
-    await rm(directory, { recursive: true, force: true });
+    await rm(directory, { recursive: true, force: true, maxRetries: 4, retryDelay: 100 });
   }
 }
 
