@@ -4,6 +4,7 @@ import * as p from "@clack/prompts";
 import { getStorageInfo, getStoredToken, saveToken } from "../storage.js";
 import { verifyHuggingFaceToken } from "../agent.js";
 import { HuggingController } from "../controller.js";
+import { formatUpdateNotice } from "../update-check.js";
 import { HuggingCodeApp } from "./App.js";
 
 const TOKEN_URL = "https://huggingface.co/settings/tokens/new?ownUserPermissions=inference.serverless.write&tokenType=fineGrained";
@@ -54,5 +55,11 @@ export async function startInteractiveTui(options = {}) {
   const controller = await HuggingController.create({ token, workspaceRoot: options.workspaceRoot || process.cwd() });
   await controller.initialize();
   const app = render(h(HuggingCodeApp, { controller }), { exitOnCtrlC: false });
+  if (options.updateCheck) {
+    void Promise.resolve(options.updateCheck).then((update) => {
+      const content = formatUpdateNotice(update);
+      if (content) controller.emit({ type: "notice", level: "info", content });
+    });
+  }
   await app.waitUntilExit();
 }
