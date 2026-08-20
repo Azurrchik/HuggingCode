@@ -97,3 +97,18 @@ test("transcript хранит имя инструмента для tool и diff-
   assert.equal(rows[0].tool, "replace_in_file");
   assert.equal(rows[1].tool, "replace_in_file");
 });
+
+test("controller выводит контекстную /help-справку и открывает theme picker", async () => {
+  const controller = controllerFixture();
+  const events = [];
+  controller.subscribe((event) => events.push(event));
+
+  await controller.runSlash("/help model");
+  assert.equal(events.at(-1).type, "assistant_final");
+  assert.match(events.at(-1).content, /Открыть список Hugging Face моделей/);
+
+  await controller.runSlash("/theme");
+  assert.equal(events.at(-1).type, "theme_picker_requested");
+  await controller.runSlash("/color");
+  assert.equal(events.at(-1).type, "theme_picker_requested");
+});

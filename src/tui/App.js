@@ -11,6 +11,7 @@ import { CommandPalette } from "./CommandPalette.js";
 import { FullModeDialog } from "./FullModeDialog.js";
 import { HeaderBar } from "./HeaderBar.js";
 import { FooterBar } from "./FooterBar.js";
+import { ThemePicker } from "./ThemePicker.js";
 
 export function HuggingCodeApp({ controller }) {
   const { exit } = useApp();
@@ -25,15 +26,19 @@ export function HuggingCodeApp({ controller }) {
   const [modelPicker, setModelPicker] = useState(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [fullModeRequest, setFullModeRequest] = useState(null);
+  const [themePicker, setThemePicker] = useState(null);
   const [goal, setGoal] = useState("");
-  const { colors: theme } = useMemo(() => resolveTheme(controller.config.theme), [controller.config.theme]);
-  const overlayOpen = Boolean(approval || modelPicker || paletteOpen || fullModeRequest);
+  const [themeName, setThemeName] = useState(controller.config.theme);
+  const { colors: theme } = useMemo(() => resolveTheme(themeName), [themeName]);
+  const overlayOpen = Boolean(approval || modelPicker || paletteOpen || fullModeRequest || themePicker);
 
   useEffect(() => controller.subscribe((event) => {
     if (event.type === "approval_requested") setApproval(event.action);
     if (event.type === "model_picker_requested") setModelPicker(event);
     if (event.type === "full_mode_requested") setFullModeRequest(event);
-    if (!["approval_requested", "model_picker_requested", "full_mode_requested"].includes(event.type)) {
+    if (event.type === "theme_picker_requested") setThemePicker(event);
+    if (event.type === "theme_changed") setThemeName(event.theme);
+    if (!["approval_requested", "model_picker_requested", "full_mode_requested", "theme_picker_requested"].includes(event.type)) {
       setRows((current) => appendTranscript(current, event));
     }
   }), [controller]);
@@ -79,10 +84,11 @@ export function HuggingCodeApp({ controller }) {
       return;
     }
     if (modelPicker) return setModelPicker(null);
+    if (themePicker) return setThemePicker(null);
     if (paletteOpen) return setPaletteOpen(false);
     if (busy && controller.cancel()) return;
     if (input) setInput("");
-  }, [approval, busy, controller, fullModeRequest, input, modelPicker, paletteOpen]);
+  }, [approval, busy, controller, fullModeRequest, input, modelPicker, paletteOpen, themePicker]);
 
   useInput((value, key) => {
     if ((key.ctrl && value.toLowerCase() === "c") || (key.ctrl && value.toLowerCase() === "d")) {
@@ -92,11 +98,15 @@ export function HuggingCodeApp({ controller }) {
     }
     if (overlayOpen) return;
     if (key.ctrl && value.toLowerCase() === "m") {
-      void execute("/model");
+      submit("/model");
       return;
     }
     if (key.ctrl && value.toLowerCase() === "p") {
       setPaletteOpen(true);
+      return;
+    }
+    if (key.ctrl && value.toLowerCase() === "t") {
+      submit("/theme");
       return;
     }
     if (key.ctrl && value.toLowerCase() === "l") {
@@ -113,6 +123,17 @@ export function HuggingCodeApp({ controller }) {
     }
   }, [controller]);
 
+  const chooseTheme = useCallback(async (nextTheme) => {
+    setThemePicker(null);
+    try {
+      await controller.updateConfig({ theme: nextTheme });
+      setThemeName(nextTheme);
+      setRows((current) => appendTranscript(current, { type: "notice", level: "info", content: `Тема применена: ${nextTheme}.` }));
+    } catch (error) {
+      setRows((current) => appendTranscript(current, { type: "error", content: error.message }));
+    }
+  }, [controller]);
+
   const maxRows = Math.max(7, terminalRows - (terminalColumns < 70 ? 13 : 12));
   const status = controller.getStatus({ busy, queueCount: queue.length, goal });
 
@@ -121,6 +142,7 @@ export function HuggingCodeApp({ controller }) {
     h(TranscriptView, { rows, theme, maxRows }),
     approval ? h(PermissionCard, { request: approval, theme, onDecide: (decision) => { controller.resolveApproval(decision); setApproval(null); } }) : null,
     modelPicker ? h(ModelPicker, { models: modelPicker.models, source: modelPicker.source, currentModel: modelPicker.currentModel, theme, onSelect: chooseModel, onClose: () => setModelPicker(null) }) : null,
+    themePicker ? h(ThemePicker, { currentTheme: themeName, theme, onSelect: chooseTheme, onClose: () => setThemePicker(null) }) : null,
     paletteOpen ? h(CommandPalette, { theme, onExecute: (command) => { setPaletteOpen(false); submit(command); }, onClose: () => setPaletteOpen(false) }) : null,
     fullModeRequest ? h(FullModeDialog, { phrase: fullModeRequest.phrase, workspace: fullModeRequest.workspace, theme, onConfirm: (phrase) => { if (controller.confirmFullMode(phrase)) setFullModeRequest(null); }, onCancel: () => { controller.cancelFullModeActivation(); setFullModeRequest(null); } }) : null,
     h(StatusBar, { status, theme }),

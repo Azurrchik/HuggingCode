@@ -12,6 +12,8 @@ import { createWorkspace } from "./workspace.js";
 import { CheckpointStore } from "./checkpoints.js";
 import { detectProjectChecks } from "./verification.js";
 import { fallbackCatalog, fetchModelCatalog, formatModelSelection, searchModels } from "./model-catalog.js";
+import { formatHelp } from "./command-catalog.js";
+import { normalizeTheme } from "./tui/theme.js";
 
 const MEMORY_FILE = "HUGGINGCODE.md";
 export const FULL_MODE_PHRASE = "ENABLE FULL MODE";
@@ -223,12 +225,20 @@ export class HuggingController {
     pending.resolve(false);
   }
 
+  async runReadOnlyReview(title, instructions, focus = "") {
+    const diff = await this.workspace.getGitDiff();
+    const question = `${instructions}\n\nFocus: ${focus || "all current changes"}\n\nCurrent Git diff:\n${diff}`;
+    const answer = await this.agent.askSideQuestion(question, { signal: this.currentTurn?.abort.signal });
+    this.emit({ type: "assistant_final", turnId: this.currentTurn?.id, content: `${title}\n${answer}` });
+  }
+
   async runSlash(input) {
     const [command, ...parts] = input.slice(1).trim().split(/\s+/);
     const arg = parts.join(" ").trim();
     switch ((command || "").toLowerCase()) {
       case "help":
-        this.emit({ type: "assistant_final", turnId: this.currentTurn?.id, content: "Команды: /help, /models, /model <id>, /mode <manual|accept-edits|plan|safe-auto|full>, /context, /compact, /undo, /verify, /sessions, /resume <id>, /branch <name>, /rename <name>, /export <path>, /skills, /skill <name> [args], /attach <path>, /subtask <task>, /tasks, /stop <id>, /clear, /status, /logout, /exit. Используйте Tab для подсказок." });
+      case "commands":
+        this.emit({ type: "assistant_final", turnId: this.currentTurn?.id, content: formatHelp(arg) });
         return;
       case "status":
         this.emit({ type: "assistant_final", turnId: this.currentTurn?.id, content: `Модель: ${this.config.model}\nРежим: ${this.runtimePermissionMode}\nРабочая область: ${this.workspace.root}` });
@@ -258,13 +268,18 @@ export class HuggingController {
         }
         return;
       case "theme":
+      case "color": {
         if (!arg) {
-          this.emit({ type: "assistant_final", turnId: this.currentTurn?.id, content: `Тема: ${this.config.theme}. Доступно: ember, ocean, forest, violet.` });
-        } else {
-          await this.updateConfig({ theme: arg });
-          this.emit({ type: "notice", level: "info", content: `Тема обновлена: ${arg}. Перезапустите HuggingCode для смены цветов текущего окна.` });
+          this.emit({ type: "theme_picker_requested", currentTheme: this.config.theme });
+          return;
         }
+        const theme = normalizeTheme(arg);
+        if (!theme) throw new Error("Неизвестная тема. Откройте /theme и выберите вариант из списка.");
+        await this.updateConfig({ theme });
+        this.emit({ type: "theme_changed", theme });
+        this.emit({ type: "notice", level: "info", content: `Тема применена: ${theme}.` });
         return;
+      }
       case "mode":
       case "permissions":
         if (!arg) {
@@ -286,10 +301,13 @@ export class HuggingController {
         return;
       }
       case "clear":
+      case "new":
+      case "reset": {
         this.agent.reset();
         await this.persist("clear");
         this.emit({ type: "notice", level: "info", content: "Контекст очищен; сессия сохранена." });
         return;
+      }
       case "undo": {
         const result = await this.checkpoints.undoLatest();
         if (!result.found) {
@@ -305,7 +323,8 @@ export class HuggingController {
         }
         return;
       }
-      case "verify": {
+      case "verify":
+      case "run": {
         const checks = await detectProjectChecks(this.workspace.root);
         if (!checks.length) {
           this.emit({ type: "notice", level: "warn", content: "Не удалось автоматически определить проверки проекта." });
@@ -320,6 +339,55 @@ export class HuggingController {
           const output = await this.workspace.runCommand(check.command);
           this.emit({ type: "verification", turnId: this.currentTurn?.id, content: `${check.label}\n${output}` });
         }
+        return;
+      }
+      case "diff": {
+        const diff = await this.workspace.getGitDiff();
+        this.emit({ type: "assistant_final", turnId: this.currentTurn?.id, content: diff });
+        return;
+      }
+      case "review":
+      case "code-review":
+        await this.runReadOnlyReview("Code review", "Review the current Git diff. Identify correctness risks, regressions, edge cases and missing tests. Do not suggest or perform edits.", arg);
+        return;
+      case "security-review":
+        await this.runReadOnlyReview("Security review", "Review the current Git diff for secrets exposure, unsafe input handling, authorization mistakes, path traversal, injection and dependency risks. Do not suggest or perform edits.", arg);
+        return;
+      case "simplify":
+        await this.runReadOnlyReview("Simplification review", "Review the current Git diff and nearby design for duplication, over-complexity and opportunities to simplify. Do not suggest or perform edits.", arg);
+        return;
+      case "plan": {
+        await this.updateConfig({ permissionMode: "plan" });
+        this.emit({ type: "notice", level: "info", content: "Включён plan mode: запись файлов и команды заблокированы." });
+        if (arg) await this.agent.ask(`Составь конкретный план реализации задачи без изменения файлов: ${arg}`, { signal: this.currentTurn?.abort.signal, stream: true });
+        return;
+      }
+      case "init": {
+        const template = "# HuggingCode project memory\n\n## Команды проверки\n\n- npm test\n\n## Соглашения\n\n- Опишите архитектурные и кодовые правила проекта здесь.\n";
+        const result = await this.workspace.execute("write_file", { path: MEMORY_FILE, content: this.memory || template, reason: "Создать локальную память и соглашения проекта." }, (action) => this.requestApproval(action));
+        if (!result.startsWith("User declined")) {
+          this.memory = await memoryFrom(this.workspace.root);
+          this.agent.setMemory(this.memory);
+        }
+        this.emit({ type: "notice", level: "info", content: result });
+        return;
+      }
+      case "memory": {
+        if (!arg) {
+          this.emit({ type: "assistant_final", turnId: this.currentTurn?.id, content: this.memory || `Память проекта пока пуста. Используйте /init или /memory add <правило>.` });
+          return;
+        }
+        const prefix = "add ";
+        if (!arg.toLowerCase().startsWith(prefix)) throw new Error("Используйте /memory add <текст> для дополнения HUGGINGCODE.md.");
+        const addition = arg.slice(prefix.length).trim();
+        if (!addition) throw new Error("Укажите текст после /memory add.");
+        const content = `${this.memory ? `${this.memory.trimEnd()}\n\n` : "# HuggingCode project memory\n\n"}${addition}\n`;
+        const result = await this.workspace.execute("write_file", { path: MEMORY_FILE, content, reason: "Дополнить локальную память проекта." }, (action) => this.requestApproval(action));
+        if (!result.startsWith("User declined")) {
+          this.memory = await memoryFrom(this.workspace.root);
+          this.agent.setMemory(this.memory);
+        }
+        this.emit({ type: "notice", level: "info", content: result });
         return;
       }
       case "sessions": {
@@ -355,7 +423,8 @@ export class HuggingController {
         this.emit({ type: "notice", level: "info", content: result });
         return;
       }
-      case "skills": {
+      case "skills":
+      case "reload-skills": {
         const skills = await listSkills(this.workspace.root);
         this.emit({ type: "assistant_final", turnId: this.currentTurn?.id, content: skills.length ? skills.map((skill) => `/${skill.name} — ${skill.description}`).join("\n") : "Пользовательские навыки не найдены. Создайте .huggingcode/skills/<name>.md." });
         return;
@@ -396,7 +465,8 @@ export class HuggingController {
         this.emit({ type: "notice", level: "info", content: `Подзадача запущена: ${task.id}` });
         return;
       }
-      case "tasks": {
+      case "tasks":
+      case "agents": {
         const tasks = this.tasks.list();
         this.emit({ type: "assistant_final", turnId: this.currentTurn?.id, content: tasks.length ? tasks.map((task) => `${task.id} · ${task.status} · ${task.title}`).join("\n") : "Локальных подзадач нет." });
         return;
@@ -407,7 +477,8 @@ export class HuggingController {
         this.emit({ type: "notice", level: "warn", content: `Подзадача остановлена: ${task.id}` });
         return;
       }
-      case "doctor": {
+      case "doctor":
+      case "checkup": {
         const checkpoints = await this.checkpoints.list();
         const skills = await listSkills(this.workspace.root);
         const platform = platformSnapshot();
@@ -433,8 +504,17 @@ export class HuggingController {
         await clearStoredToken();
         this.emit({ type: "notice", level: "warn", content: "Токен удалён. Перезапустите HuggingCode для нового входа." });
         return;
-      default:
-        this.emit({ type: "error", turnId: this.currentTurn?.id, content: `Команда /${command || ""} пока не перенесена в Interactive TUI. Используйте обычную задачу или /help.` });
+      default: {
+        const skills = await listSkills(this.workspace.root);
+        const shortcut = skills.find((skill) => skill.name === String(command || "").toLowerCase());
+        if (shortcut) {
+          const skill = await loadSkill(this.workspace.root, shortcut.name, arg);
+          await this.agent.ask(`Run the user-invoked project skill “${skill.name}”. Follow its instructions precisely within the existing safety boundaries.\n\n${skill.prompt}`, { signal: this.currentTurn?.abort.signal, stream: true });
+          await this.persist(`skill:${skill.name}`);
+          return;
+        }
+        this.emit({ type: "error", turnId: this.currentTurn?.id, content: `Команда /${command || ""} не найдена. Используйте /help для списка или /help <команда> для краткого описания.` });
+      }
     }
   }
 

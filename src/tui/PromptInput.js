@@ -1,13 +1,8 @@
 import React, { createElement as h, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
+import { commandSuggestions } from "../command-catalog.js";
 
-const COMMANDS = [
-  ["help", "all commands"], ["model", "select a Hugging Face model"], ["models", "print coding model catalog"], ["mode", "change permission mode"], ["full", "autonomous mode is available through /mode full"],
-  ["context", "inspect context"], ["compact", "summarize context"], ["undo", "restore latest agent checkpoint"], ["verify", "run project checks"],
-  ["sessions", "browse sessions"], ["resume", "restore a session"], ["branch", "branch session"], ["export", "export Markdown"],
-  ["skills", "project skills"], ["attach", "attach text file"], ["subtask", "start side task"], ["tasks", "side task status"],
-  ["doctor", "diagnostics"], ["clear", "clear transcript"], ["logout", "remove token"], ["exit", "quit"],
-];
+const COMMANDS = commandSuggestions();
 
 function printable(input, key) {
   return input && !key.ctrl && !key.meta && !key.escape && !key.return && !key.tab;
@@ -76,7 +71,7 @@ export function PromptInput({ value, onChange, onSubmit, disabled = false, pendi
     h(Box, { borderStyle: "round", borderColor: disabled ? theme.warning : theme.accent, paddingX: 1, flexDirection: "column" },
       h(Box, null,
         h(Text, { color: theme.accent, bold: true }, "❯ "),
-        h(Text, { color: value ? undefined : theme.muted }, value ? "" : "Describe a task, use / for actions, or Ctrl+P for palette"),
+        h(Text, { color: value ? undefined : theme.muted }, value ? "" : "Опишите задачу, введите / для команд или Ctrl+P для палитры"),
         pending > 0 ? h(Text, { color: theme.info }, `  queue ${pending}`) : null,
       ),
       value ? h(Box, { flexDirection: "column", paddingLeft: 2 }, lines.map((line, index) => h(Text, { key: `${index}-${line}` }, index === lines.length - 1 ? `${line}▍` : line || " "))) : null,
@@ -88,8 +83,8 @@ export function PromptInput({ value, onChange, onSubmit, disabled = false, pendi
       )),
     ) : null,
     h(Box, { marginLeft: 1 },
-      h(Text, { dimColor: true }, "Enter send · Shift+Enter newline · ↑/↓ history · Tab complete · Ctrl+M models · Ctrl+P palette · Esc cancel"),
+      h(Text, { dimColor: true }, "Enter отправить · Shift+Enter строка · ↑/↓ история · Tab дополнить · Ctrl+M модели · Ctrl+P палитра · Esc отменить"),
     ),
-    disabled ? h(Text, { color: theme.warning }, "  An overlay is active. Esc closes or cancels it.") : null,
+    disabled ? h(Text, { color: theme.warning }, "  Открыто окно выбора. Esc закрывает или отменяет его.") : null,
   );
 }
