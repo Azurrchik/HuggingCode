@@ -27,9 +27,13 @@ test("Tauri config bundles the safe local controller bridge and source modules",
   assert.equal(config.bundle.resources.runtime, "runtime");
 });
 
-test("Tauri default app icon is present for native package builds", async () => {
-  const icon = await stat(path.join(root, "desktop/tauri/icons/icon.png"));
-  assert.ok(icon.size > 0);
+test("Tauri default app icons are present for native package builds", async () => {
+  const [png, ico] = await Promise.all([
+    stat(path.join(root, "desktop/tauri/icons/icon.png")),
+    stat(path.join(root, "desktop/tauri/icons/icon.ico")),
+  ]);
+  assert.ok(png.size > 0);
+  assert.ok(ico.size > 0);
 });
 
 test("desktop trajectory renderer exposes observed events but has no raw thinking display", async () => {
