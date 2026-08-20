@@ -2,6 +2,11 @@ name: Tauri desktop builds
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Тег GitHub Release, который нужно создать или обновить (например, v1.0.1)"
+        required: false
+        type: string
   push:
     tags:
       - "v*"
@@ -42,3 +47,34 @@ jobs:
           name: HuggingCode-${{ matrix.name }}
           path: desktop/tauri/target/release/bundle
           if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    needs: package
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+      - name: Create or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag || github.ref_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${RELEASE_TAG#v}"
+          mapfile -d '' assets < <(find release-artifacts -type f \( -name '*.exe' -o -name '*.msi' -o -name '*.dmg' -o -name '*.deb' -o -name '*.AppImage' \) -print0 | sort -z)
+          if [ "${#assets[@]}" -eq 0 ]; then
+            echo "No release installers were found."
+            exit 1
+          fi
+          notes=$'Desktop hotfix and cross-platform installer release.\n\nInstall the CLI with `npm install -g huggingcode`, then run `huggingcode`.'
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" "${assets[@]}" --clobber
+          else
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --title "HuggingCode $version" --notes "$notes" "${assets[@]}"
+          fi
