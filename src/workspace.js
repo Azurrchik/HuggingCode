@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdir, readdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { diffLines } from "diff";
 
 const execFileAsync = promisify(execFile);
 const MAX_FILE_BYTES = 200_000;
@@ -180,6 +181,7 @@ async function assertPhysicalContainment(root, target) {
 export async function createWorkspace(workspacePath = process.cwd(), addedDirectories = []) {
   const primaryRoot = await realWorkspacePath(workspacePath);
   const roots = new Map([["workspace", primaryRoot]]);
+  let mutationListener = async () => {};
 
   for (const candidate of addedDirectories) {
     try {
@@ -293,6 +295,44 @@ export async function createWorkspace(workspacePath = process.cwd(), addedDirect
     return matches.length ? matches.join("\n") : "No matches found.";
   }
 
+  async function previewFileChange(inputPath, nextContent) {
+    const { rootId, root, target } = resolveInput(inputPath);
+    const label = displayPath(rootId, root, target);
+    await assertPhysicalContainment(root, path.dirname(target));
+    if (isSecretPath(label)) throw new Error("Предпросмотр файлов секретов запрещён по умолчанию.");
+    const info = await statIfExists(target);
+    if (info && !info.isFile()) throw new Error("Целевой путь не является обычным файлом.");
+    if (info?.size > MAX_FILE_BYTES) throw new Error(`Файл больше лимита ${MAX_FILE_BYTES} байт.`);
+    const previous = info ? await readFile(target, "utf8") : "";
+    const lines = [];
+    for (const part of diffLines(previous, String(nextContent ?? ""))) {
+      const marker = part.added ? "+" : part.removed ? "-" : " ";
+      for (const line of part.value.split(/\r?\n/)) {
+        if (line || part.value.endsWith("\n")) lines.push(`${marker}${line}`);
+      }
+    }
+    return { label, target, previous, previousExists: Boolean(info), next: String(nextContent ?? ""), diff: truncate(lines.join("\n") || "(без текстовых изменений)", 20_000) };
+  }
+
+  async function previewReplacement(inputPath, oldString, newString, replaceAll = false) {
+    if (typeof oldString !== "string" || oldString.length === 0) throw new Error("old_string не может быть пустой строкой.");
+    const { rootId, root, target } = resolveInput(inputPath);
+    const label = displayPath(rootId, root, target);
+    await assertPhysicalContainment(root, target);
+    if (isSecretPath(label)) throw new Error("Предпросмотр файлов секретов запрещён по умолчанию.");
+    const previous = await readFile(target, "utf8");
+    const occurrences = previous.split(oldString).length - 1;
+    if (occurrences === 0) throw new Error("old_string не найдена в целевом файле.");
+    if (occurrences > 1 && !replaceAll) throw new Error("old_string встречается несколько раз; используйте replace_all или более точный фрагмент.");
+    const next = replaceAll ? previous.replaceAll(oldString, newString) : previous.replace(oldString, newString);
+    const preview = await previewFileChange(inputPath, next);
+    return { ...preview, occurrences: replaceAll ? occurrences : 1, label };
+  }
+
+  async function previewDeletion(inputPath) {
+    return previewFileChange(inputPath, "");
+  }
+
   async function writeTextFile(inputPath, content) {
     const { rootId, root, target } = resolveInput(inputPath);
     const label = displayPath(rootId, root, target);
@@ -400,16 +440,28 @@ export async function createWorkspace(workspacePath = process.cwd(), addedDirect
       case "get_git_diff":
         return getGitDiff({ staged: args.staged, statOnly: args.stat_only });
       case "write_file": {
-        const allowed = await approve({ type: "write", path: args.path, content: args.content, reason: args.reason });
-        return allowed ? writeTextFile(args.path, args.content) : "User declined this file change.";
+        const preview = await previewFileChange(args.path, args.content);
+        const allowed = await approve({ type: "write", path: preview.label, content: preview.diff, before: preview.previous, after: preview.next, reason: args.reason });
+        if (!allowed) return "User declined this file change.";
+        const result = await writeTextFile(args.path, args.content);
+        await mutationListener({ type: "write", target: preview.target, label: preview.label, before: { exists: preview.previousExists, content: preview.previous }, after: { exists: true, content: preview.next } });
+        return result;
       }
       case "replace_in_file": {
-        const allowed = await approve({ type: "write", path: args.path, content: `Replace:\n${args.old_string}\n→\n${args.new_string}`, reason: args.reason });
-        return allowed ? replaceInFile(args.path, args.old_string, args.new_string, args.replace_all) : "User declined this file change.";
+        const preview = await previewReplacement(args.path, args.old_string, args.new_string, args.replace_all);
+        const allowed = await approve({ type: "write", path: preview.label, content: preview.diff, before: preview.previous, after: preview.next, reason: args.reason });
+        if (!allowed) return "User declined this file change.";
+        const result = await replaceInFile(args.path, args.old_string, args.new_string, args.replace_all);
+        await mutationListener({ type: "replace", target: preview.target, label: preview.label, before: { exists: preview.previousExists, content: preview.previous }, after: { exists: true, content: preview.next } });
+        return result;
       }
       case "delete_file": {
-        const allowed = await approve({ type: "delete", path: args.path, reason: args.reason });
-        return allowed ? deleteOneFile(args.path) : "User declined file deletion.";
+        const preview = await previewDeletion(args.path);
+        const allowed = await approve({ type: "delete", path: preview.label, content: preview.diff, before: preview.previous, reason: args.reason });
+        if (!allowed) return "User declined file deletion.";
+        const result = await deleteOneFile(args.path);
+        await mutationListener({ type: "delete", target: preview.target, label: preview.label, before: { exists: preview.previousExists, content: preview.previous }, after: { exists: false, content: "" } });
+        return result;
       }
       case "run_command": {
         const allowed = await approve({ type: "command", command: args.command, reason: args.reason });
@@ -430,11 +482,15 @@ export async function createWorkspace(workspacePath = process.cwd(), addedDirect
     writeTextFile,
     replaceInFile,
     deleteOneFile,
+    previewFileChange,
+    previewReplacement,
+    previewDeletion,
     runCommand,
     getGitStatus,
     getGitDiff,
     addDirectory,
     listRoots,
+    setMutationListener(listener) { mutationListener = typeof listener === "function" ? listener : async () => {}; },
   };
 }
 

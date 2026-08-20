@@ -1,16 +1,17 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { startInteractive } from "../src/ui.js";
+import { startInteractiveTui } from "../src/tui/start.js";
 
 const program = new Command();
 
 program
   .name("huggingcode")
-  .description("Локальный coding agent с удалёнными моделями Hugging Face")
-  .version("0.1.0")
-  .action(async () => {
+  .description("Интерактивный coding agent с удалёнными моделями Hugging Face")
+  .version("0.3.0")
+  .option("--cwd <path>", "рабочий каталог проекта")
+  .action(async (options) => {
     try {
-      await startInteractive();
+      await startInteractiveTui({ workspaceRoot: options.cwd });
     } catch (error) {
       console.error(`\nHuggingCode: ${error.message}`);
       process.exitCode = 1;

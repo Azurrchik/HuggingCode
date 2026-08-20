@@ -1,7 +1,7 @@
 {
   "name": "huggingcode",
-  "version": "0.2.0",
-  "description": "Local coding agent CLI powered by Hugging Face Inference Providers.",
+  "version": "0.3.0",
+  "description": "Interactive Hugging Face coding agent with streaming TUI, safe approvals, checkpoints, and undo.",
   "type": "module",
   "bin": {
     "huggingcode": "./bin/huggingcode.js"
@@ -17,7 +17,7 @@
     "start": "node ./bin/huggingcode.js",
     "dev": "node --watch ./bin/huggingcode.js",
     "test": "node --test",
-    "lint": "node --check ./bin/huggingcode.js && node --check ./src/storage.js && node --check ./src/config.js && node --check ./src/permissions.js && node --check ./src/session-store.js && node --check ./src/skills.js && node --check ./src/tasks.js && node --check ./src/workspace.js && node --check ./src/agent.js && node --check ./src/ui.js",
+    "lint": "node --check ./bin/huggingcode.js && node --check ./src/storage.js && node --check ./src/config.js && node --check ./src/permissions.js && node --check ./src/session-store.js && node --check ./src/skills.js && node --check ./src/tasks.js && node --check ./src/workspace.js && node --check ./src/agent.js && node --check ./src/checkpoints.js && node --check ./src/verification.js && node --check ./src/controller.js && node --check ./src/tui/transcript.js && node --check ./src/tui/theme.js && node --check ./src/tui/TranscriptView.js && node --check ./src/tui/StatusBar.js && node --check ./src/tui/PromptInput.js && node --check ./src/tui/PermissionCard.js && node --check ./src/tui/start.js",
     "prepublishOnly": "npm run lint && npm test"
   },
   "publishConfig": {
@@ -41,14 +41,16 @@
   ],
   "license": "MIT",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
   "dependencies": {
     "@clack/prompts": "^0.11.0",
     "@huggingface/inference": "^4.13.6",
-    "chalk": "^5.4.1",
     "commander": "^14.0.1",
     "diff": "^8.0.2",
+    "ink": "^7.1.1",
+    "ink-text-input": "^6.0.0",
+    "react": "^19.2.8",
     "zod": "^4.1.12"
   }
 }

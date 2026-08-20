@@ -30,7 +30,9 @@ test("permission modes keep dangerous actions behind an explicit prompt", () => 
 test("sessions can be saved, listed, branched and exported", async () => {
   await withDirectory("huggingcode-session-", async (configHome) => {
     const previousAppData = process.env.APPDATA;
+    const previousXdgConfigHome = process.env.XDG_CONFIG_HOME;
     process.env.APPDATA = configHome;
+    process.env.XDG_CONFIG_HOME = configHome;
     try {
       const session = await createSession({
         name: "Первый план",
@@ -49,6 +51,8 @@ test("sessions can be saved, listed, branched and exported", async () => {
     } finally {
       if (previousAppData === undefined) delete process.env.APPDATA;
       else process.env.APPDATA = previousAppData;
+      if (previousXdgConfigHome === undefined) delete process.env.XDG_CONFIG_HOME;
+      else process.env.XDG_CONFIG_HOME = previousXdgConfigHome;
     }
   });
 });

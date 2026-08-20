@@ -1,6 +1,6 @@
 # HuggingCode
 
-**HuggingCode** — локальный терминальный coding agent для Windows с удалёнными моделями **Hugging Face Inference Providers**. Он поддерживает самостоятельный набор рабочих процессов: планирование, контекст, режимы разрешений, Git diff, проверку изменений, память проекта, пользовательские навыки, локальные подзадачи и сохранённые сессии. Модельные веса не скачиваются и не запускаются на компьютере.
+**HuggingCode** — интерактивный терминальный coding agent для Windows с удалёнными моделями **Hugging Face Inference Providers**. Он показывает потоковый transcript работы агента, безопасные карточки подтверждения, контекст и usage в постоянной status bar, сохраняет сессии и file checkpoints для `/undo`. Модельные веса не скачиваются и не запускаются на компьютере.
 
 > HuggingCode не является копией или ребрендингом другого CLI. Это независимая реализация общих сценариев терминального coding agent; фирменные облачные сервисы, чужой закрытый код и небезопасный обход подтверждений не включены.
 
@@ -10,13 +10,15 @@
 | Первый вход | Запрашивает и проверяет fine-grained токен Hugging Face с разрешением **Make calls to Inference Providers**. |
 | Хранение токена | Шифрует токен Windows DPAPI, привязанный к текущей учётной записи. |
 | Файловая защита | Работает только в доверенных каталогах, не выходит по символьным ссылкам и блокирует `.env` и типовые файлы секретов. |
-| Режимы прав | Поддерживает `manual`, `accept-edits`, `plan` и консервативный `safe-auto`. |
-| Сессии | Сохраняет локальные снимки, ветви, контрольные точки, экспорт и возобновление. |
-| Расширение | Загружает Markdown-навыки из `.huggingcode/skills`. |
+| Интерактивный TUI | Показывает timeline сообщений, tool calls, результаты, безопасные confirmation cards, slash-подсказки и историю ввода. |
+| Потоковые ответы | Использует Hugging Face chat-completion streaming, когда он поддержан выбранным model/provider; при отказе прозрачно переходит к обычному запросу. |
+| Режимы прав | Поддерживает `manual`, `accept-edits`, `plan` и консервативный `safe-auto`; bypass-режима нет. |
+| Recovery | Создаёт приватный file checkpoint для agent edits; `/undo` восстанавливает последний turn, не затирая более новые ручные изменения. |
+| Сессии и расширение | Сохраняет локальные сессии, ветви и экспорт; загружает Markdown-навыки из `.huggingcode/skills`. |
 
 ## Установка и запуск
 
-Требуются **Windows**, Node.js **20+**, npm и аккаунт Hugging Face. Hugging Face предоставляет единый маршрутизатор для удалённых моделей и JavaScript-клиент для chat completion.[1]
+Требуются **Windows**, Node.js **22+**, npm и аккаунт Hugging Face. Hugging Face предоставляет единый маршрутизатор для удалённых моделей и JavaScript-клиент для chat completion.[1]
 
 ### Вариант 1 — установить через npm (рекомендуется)
 
@@ -59,17 +61,17 @@ huggingcode
 
 | Задача | Команда |
 |---|---|
-| План без изменений файлов | `/plan исправить ошибку авторизации` |
-| Показать/сменить режим прав | `/permissions` или `/mode manual` |
+| Посмотреть подсказки и каталог моделей | `/help`, `/models`, `/model <идентификатор>` |
+| Показать/сменить режим прав | `/mode`, `/mode manual`, `/mode plan` |
 | Посмотреть контекст и сжать его | `/context`, `/compact` |
-| Изменить модель или effort | `/model Qwen/Qwen3-Coder-480B-A35B-Instruct:fastest`, `/effort high` |
-| Посмотреть изменения и проверить их | `/diff`, `/review`, `/security-review`, `/verify` |
-| Создать память проекта | `/init`, затем `/memory add всегда запускать npm test` |
-| Использовать сохранённую сессию | `/resume`, `/branch эксперимент`, `/rewind 1` |
-| Создать пользовательский навык | `.huggingcode/skills/<name>.md`, затем `/<name> аргументы` |
-| Запустить локальную исследовательскую подзадачу | `/subtask исследуй стратегию миграции`, затем `/tasks` |
+| Откатить поддержанные file edits | `/undo` |
+| Запустить найденные lint/typecheck/test | `/verify` |
+| Управлять сессиями | `/sessions [поиск]`, `/resume <id>`, `/branch <имя>`, `/rename <имя>`, `/export [путь]` |
+| Использовать пользовательский навык | `/skills`, `/skill <имя> [аргументы]` |
+| Добавить текстовый файл к следующему запросу | `/attach <путь>`, `/attach clear` |
+| Запустить локальную исследовательскую подзадачу | `/subtask <задача>`, `/tasks`, `/stop <id>` |
 
-Полный справочник с примерами и картой реализованных локальных аналогов находится в [docs/commands.md](docs/commands.md). Архитектурные границы приведены в [docs/extended-architecture.md](docs/extended-architecture.md). Пошаговый запуск, публикация в GitHub и npm описаны в [docs/PUBLISHING.md](docs/PUBLISHING.md).
+Спецификация Interactive TUI находится в [docs/0.3-interactive-tui-spec.md](docs/0.3-interactive-tui-spec.md), а архитектура — в [docs/0.3-architecture.md](docs/0.3-architecture.md). Пошаговый запуск, публикация в GitHub и npm описаны в [docs/PUBLISHING.md](docs/PUBLISHING.md).
 
 ## Режимы разрешений
 
@@ -86,7 +88,7 @@ huggingcode
 
 ## Проектная память и навыки
 
-`/init` создаёт `HUGGINGCODE.md` в корне проекта. Его содержимое добавляется к системному контексту локальной сессии. Не помещайте в этот файл секреты.
+Файл `HUGGINGCODE.md` в корне проекта добавляется к системному контексту локальной сессии. Создайте его вручную для соглашений команды и не помещайте в него секреты.
 
 Пользовательский навык — это Markdown-файл в `.huggingcode/skills`. Пример:
 
@@ -127,8 +129,11 @@ HuggingCode/
 │   ├── session-store.js    # снимки, ветки и экспорт сессий
 │   ├── skills.js           # Markdown-навыки проекта
 │   ├── tasks.js            # локальные подзадачи в открытой сессии
-│   ├── workspace.js        # изоляция файлов, Git и инструменты
-│   └── ui.js               # slash-команды терминала
+│   ├── workspace.js        # изоляция файлов, Git, preview и инструменты
+│   ├── checkpoints.js      # приватные file checkpoints и conflict-aware undo
+│   ├── verification.js     # определение lint/typecheck/test
+│   ├── controller.js       # orchestration TUI, sessions и policy
+│   └── tui/                # transcript, composer, status bar и approval cards
 ├── test/
 └── docs/
 ```
