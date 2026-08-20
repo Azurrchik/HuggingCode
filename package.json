@@ -1,0 +1,54 @@
+{
+  "name": "huggingcode",
+  "version": "0.2.0",
+  "description": "Local coding agent CLI powered by Hugging Face Inference Providers.",
+  "type": "module",
+  "bin": {
+    "huggingcode": "./bin/huggingcode.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node ./bin/huggingcode.js",
+    "dev": "node --watch ./bin/huggingcode.js",
+    "test": "node --test",
+    "lint": "node --check ./bin/huggingcode.js && node --check ./src/storage.js && node --check ./src/config.js && node --check ./src/permissions.js && node --check ./src/session-store.js && node --check ./src/skills.js && node --check ./src/tasks.js && node --check ./src/workspace.js && node --check ./src/agent.js && node --check ./src/ui.js",
+    "prepublishOnly": "npm run lint && npm test"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Azurrchik/HuggingCode.git"
+  },
+  "homepage": "https://github.com/Azurrchik/HuggingCode#readme",
+  "bugs": {
+    "url": "https://github.com/Azurrchik/HuggingCode/issues"
+  },
+  "keywords": [
+    "cli",
+    "coding-agent",
+    "huggingface",
+    "inference-providers",
+    "ai",
+    "developer-tools"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.11.0",
+    "@huggingface/inference": "^4.13.6",
+    "chalk": "^5.4.1",
+    "commander": "^14.0.1",
+    "diff": "^8.0.2",
+    "zod": "^4.1.12"
+  }
+}
