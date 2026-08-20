@@ -26,6 +26,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "icon": ["icons/icon.png"],
     "category": "DeveloperTool",
     "shortDescription": "Cross-platform Hugging Face coding agent",
     "longDescription": "HuggingCode Desktop provides a local Chat and safe Trajectory view for a Hugging Face coding agent.",
