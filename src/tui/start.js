@@ -1,4 +1,4 @@
-import { h } from "react";
+import { createElement as h } from "react";
 import { render } from "ink";
 import * as p from "@clack/prompts";
 import { getStorageInfo, getProviderToken, saveProviderToken } from "../storage.js";
