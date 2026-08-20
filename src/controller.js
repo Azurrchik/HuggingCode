@@ -128,10 +128,11 @@ export class HuggingController {
   }
 
   onAgentEvent(event) {
-    const turnId = this.currentTurn?.id;
-    if (event.type === "model_request") this.emit({ type: "notice", level: "info", content: `Запрос к ${event.model}` });
+        const turnId = this.currentTurn?.id;
+    if (event.type === "model_request") this.emit({ type: "activity", turnId, stage: "analysis", content: `Шаг ${event.round}: анализирую задачу и выбираю следующий безопасный шаг · ${event.model}` });
+    if (event.type === "analysis_started") this.emit({ type: "activity", turnId, stage: "analysis", content: "Модель анализирует варианты. Ниже будут показаны конкретные действия, команды и изменения файлов." });
     if (event.type === "text_delta") this.emit({ type: "text_delta", turnId, content: event.content });
-    if (event.type === "thinking_delta") this.emit({ type: "thinking_delta", turnId, content: event.content });
+    
     if (event.type === "final") this.emit({ type: "assistant_final", turnId, content: event.content, usage: event.usage });
     if (event.type === "tool_request") this.emit({ type: "tool_started", turnId, tool: event.name, content: shortToolEvent(event), details: event.args });
     if (event.type === "tool_result") this.emit({ type: "tool_result", turnId, tool: event.name, content: `${event.name}: завершён`, details: event.result });
@@ -167,6 +168,7 @@ export class HuggingController {
       model: this.config.model,
       mode: this.runtimePermissionMode,
       effort: this.config.reasoningEffort,
+      theme: this.config.theme,
       workspace: this.workspace.root,
       context: { ...this.agent.getContextStats(), threshold: this.config.autoCompactThreshold },
       usage: this.agent.getUsage(),
@@ -524,7 +526,7 @@ export class HuggingController {
     this.currentTurn = { id: turnId, cancelled: false, abort, changedFiles: [] };
     await this.checkpoints.beginTurn(turnId);
     this.emit({ type: "user", content: input });
-    this.emit({ type: "turn_started", turnId, content: "Агент начал работу." });
+    this.emit({ type: "turn_started", turnId, content: "Задача получена. Подготавливаю план и безопасные действия." });
     try {
       if (input.startsWith("/")) {
         await this.runSlash(input);

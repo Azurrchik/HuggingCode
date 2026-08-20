@@ -1,0 +1,38 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "HuggingCode",
+  "version": "0.5.0",
+  "identifier": "io.huggingcode.desktop",
+  "build": {
+    "frontendDist": "../renderer"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "HuggingCode",
+        "width": 1320,
+        "height": 860,
+        "minWidth": 940,
+        "minHeight": 620,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'none'; img-src 'self' data:"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "DeveloperTool",
+    "shortDescription": "Cross-platform Hugging Face coding agent",
+    "longDescription": "HuggingCode Desktop provides a local Chat and safe Trajectory view for a Hugging Face coding agent.",
+    "resources": {
+      "../tauri-bridge.js": "tauri-bridge.js",
+      "../../src": "src",
+      "../runtime": "runtime"
+    }
+  }
+}

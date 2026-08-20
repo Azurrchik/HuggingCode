@@ -154,3 +154,16 @@ git push --follow-tags
 [1]: https://docs.npmjs.com/cli/v11/commands/npm-publish "npm publish — npm Docs"
 [2]: https://docs.npmjs.com/trusted-publishers/ "Trusted publishing for npm packages — npm Docs"
 [3]: https://docs.npmjs.com/creating-and-publishing-scoped-public-packages/ "Creating and publishing scoped public packages — npm Docs"
+
+
+## Desktop-артефакты Tauri 2
+
+Desktop-слой HuggingCode использует Tauri 2 и локальный Node bridge. Перед сборкой установите Rust toolchain, системные инструменты сборки вашей ОС и Node.js 22+. Команды сначала подготавливают bundled Node runtime, затем создают нативный пакет для текущей платформы.
+
+```powershell
+npm run desktop:win
+# macOS: npm run desktop:mac
+# Linux: npm run desktop:linux
+```
+
+Локальная Windows-сборка требует Visual Studio Build Tools с компонентом C++. Платформенная matrix `.github/workflows/desktop-build.yml` собирает Windows, macOS и Linux артефакты на соответствующих GitHub runners; локальные `release/`, `desktop/tauri/target/` и bundled runtime не входят в Git или npm-архив.

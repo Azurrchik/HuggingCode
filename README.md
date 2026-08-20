@@ -4,13 +4,15 @@
 
 > HuggingCode не является копией или ребрендингом другого CLI. Это самостоятельная реализация общих сценариев terminal coding agent. Он не подключает закрытый код, фирменные облачные сервисы или чужие учётные записи.
 
-| Возможность | Реализация в 0.4 |
+| Возможность | Реализация в 0.5 |
 |---|---|
 | Удалённые модели | Запросы проходят через Hugging Face Inference Providers. Базовая модель — `openai/gpt-oss-120b:fastest`. [1] |
 | Первый вход | Приложение запрашивает и проверяет fine-grained токен с разрешением **Make calls to Inference Providers**. [2] |
 | Защищённое хранение | Windows — DPAPI; macOS — Keychain; Linux — Secret Service. Если системное хранилище недоступно, токен остаётся только в памяти текущего процесса. |
 | Live model catalog | `/model` открывает searchable picker из Hugging Face Router; при временной недоступности сети используется встроенный fallback-каталог. |
 | Keyboard-first TUI | Многострочный composer, история ввода, slash-подсказки, command palette, persistent header/status/footer, transcript с tool, diff и verification-карточками. |
+| Trajectory | Отдельная вкладка с последовательностью пользовательских задач, наблюдаемых этапов, tool calls, команд, правок и результатов; поиск работает по этому журналу. Скрытые рассуждения и системные инструкции не выводятся. |
+| Desktop-приложение | Tauri 2 приложение с Chat и Trajectory, нативным выбором workspace, безопасными approvals, выбором модели и темы; единый исходный код для Windows, macOS и Linux. |
 | Режимы прав | `manual`, `accept-edits`, `plan`, `safe-auto` и session-only `full`. |
 | Безопасность workspace | Агент ограничен подключёнными workspace, не выходит по символьным ссылкам и не читает или не записывает типовые секреты, включая `.env`. |
 | Recovery | Каждый turn с правками создаёт приватный checkpoint; `/undo` восстанавливает последний поддержанный turn и не затирает более новые ручные изменения. |
@@ -34,6 +36,23 @@ huggingcode
 ```bash
 cd your-project
 npx huggingcode
+```
+
+### HuggingCode Desktop
+
+Desktop-приложение использует Tauri 2 host и локальный Node bridge поверх того же controller, тех же workspace-границ и защищённого хранения токена, что и CLI. Из исходного кода запустите его так:
+
+```bash
+npm install
+npm run desktop
+```
+
+Для нативных пакетов применяются следующие команды. Они создают Windows `.exe`, macOS `.dmg`/`.zip` и Linux `.AppImage`/`.deb` на соответствующей платформе; GitHub Actions также собирает эти артефакты на нативных runners.
+
+```bash
+npm run desktop:win
+npm run desktop:mac
+npm run desktop:linux
 ```
 
 ### Уведление об обновлении

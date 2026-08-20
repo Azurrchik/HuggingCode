@@ -12,3 +12,12 @@ build/
 *.tgz
 *.zip
 *.tar
+
+# Local desktop packaging artifacts
+release/
+
+# Local Tauri build artifacts
+desktop/tauri/target/
+
+# Bundled Node runtime prepared only for desktop packaging
+desktop/tauri/runtime/

@@ -32,13 +32,10 @@ export function appendTranscript(rows, event) {
       }
       return [...current, makeRow("assistant-live", event.content, { turnId: event.turnId })];
     }
-    case "thinking_delta": {
-      const last = current.at(-1);
-      if (last?.kind === "thinking" && last.turnId === event.turnId) {
-        return [...current.slice(0, -1), { ...last, content: `${last.content}${cleanTerminalText(event.content)}` }];
-      }
-      return [...current, makeRow("thinking", event.content, { turnId: event.turnId })];
-    }
+    case "activity":
+      return [...current, makeRow("activity", event.content || "Выполняется следующий шаг.", { turnId: event.turnId, stage: event.stage || "work" })];
+    case "thinking_delta":
+      return [...current, makeRow("activity", "Модель анализирует задачу. Конкретные действия и результаты будут показаны ниже.", { turnId: event.turnId, stage: "analysis" })];
     case "assistant_final": {
       const last = current.at(-1);
       if (last?.kind === "assistant-live" && last.turnId === event.turnId) {

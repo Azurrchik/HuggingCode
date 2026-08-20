@@ -15,6 +15,11 @@ function formatCount(value) {
   return String(n);
 }
 
+function shortActivity(value, limit = 92) {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  return text.length > limit ? `${text.slice(0, limit)}…` : text;
+}
+
 export function StatusBar({ status, theme }) {
   const context = status.context || {};
   const percent = context.threshold ? Math.min(100, Math.round((context.estimatedTokens / context.threshold) * 100)) : null;
@@ -44,5 +49,9 @@ export function StatusBar({ status, theme }) {
   h(Box, null,
       h(Text, { dimColor: true }, `${status.mode === "full" ? "АВТОНОМНЫЙ · " : ""}${status.workspace || "workspace не определён"}`),
     status.goal ? h(Text, { color: theme.info }, ` · цель: ${status.goal}`) : null,
-  ));
+  ),
+  status.busy && status.activity ? h(Box, null,
+    h(Text, { color: theme.info }, "сейчас: "),
+    h(Text, { color: theme.muted }, shortActivity(status.activity)),
+  ) : null);
 }

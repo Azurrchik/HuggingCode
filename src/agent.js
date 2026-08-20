@@ -169,7 +169,7 @@ export class CodingAgent {
     try {
       const stream = this.client.chatCompletionStream(request, { signal });
       let content = "";
-      let reasoning = "";
+      let analysisObserved = false;
       let usage = null;
       const calls = [];
       for await (const chunk of stream) {
@@ -183,15 +183,15 @@ export class CodingAgent {
           this.onEvent({ type: "text_delta", content: text });
         }
         const thinking = getTextContent(delta.reasoning_content || delta.reasoning || delta.thinking);
-        if (thinking) {
-          reasoning += thinking;
-          this.onEvent({ type: "thinking_delta", content: thinking });
+        if (thinking && !analysisObserved) {
+          analysisObserved = true;
+          this.onEvent({ type: "analysis_started" });
         }
         mergeToolDelta(calls, delta);
       }
       const response = { role: "assistant", content, ...(calls.filter(Boolean).length ? { tool_calls: calls.filter(Boolean) } : {}) };
       this.recordUsage(usage);
-      return { choices: [{ message: response }], usage, reasoning };
+      return { choices: [{ message: response }], usage, analysisObserved };
     } catch (error) {
       if (signal?.aborted || error?.name === "AbortError") throw requestAbortError();
       if (emitted) throw new Error(formatModelError(error));

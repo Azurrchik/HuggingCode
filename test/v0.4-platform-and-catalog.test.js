@@ -112,3 +112,20 @@ test("controller выводит контекстную /help-справку и �
   await controller.runSlash("/color");
   assert.equal(events.at(-1).type, "theme_picker_requested");
 });
+
+test("controller преобразует модельный анализ в безопасные activity-события", () => {
+  const controller = controllerFixture();
+  const events = [];
+  controller.subscribe((event) => events.push(event));
+  controller.currentTurn = { id: "trajectory_turn" };
+
+  controller.onAgentEvent({ type: "model_request", model: "example/model", round: 2 });
+  controller.onAgentEvent({ type: "analysis_started" });
+  controller.onAgentEvent({ type: "thinking_delta", content: "private hidden chain" });
+
+  assert.equal(events.length, 2);
+  assert.equal(events[0].type, "activity");
+  assert.match(events[0].content, /Шаг 2/);
+  assert.equal(events[1].type, "activity");
+  assert.doesNotMatch(events.map((event) => event.content).join("\n"), /private hidden chain/);
+});

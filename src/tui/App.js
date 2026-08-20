@@ -12,6 +12,7 @@ import { FullModeDialog } from "./FullModeDialog.js";
 import { HeaderBar } from "./HeaderBar.js";
 import { FooterBar } from "./FooterBar.js";
 import { ThemePicker } from "./ThemePicker.js";
+import { TrajectoryView } from "./TrajectoryView.js";
 
 export function HuggingCodeApp({ controller }) {
   const { exit } = useApp();
@@ -28,6 +29,9 @@ export function HuggingCodeApp({ controller }) {
   const [fullModeRequest, setFullModeRequest] = useState(null);
   const [themePicker, setThemePicker] = useState(null);
   const [goal, setGoal] = useState("");
+  const [view, setView] = useState("chat");
+  const [trajectoryFilter, setTrajectoryFilter] = useState("");
+  const [activity, setActivity] = useState("Готов к работе.");
   const [themeName, setThemeName] = useState(controller.config.theme);
   const { colors: theme } = useMemo(() => resolveTheme(themeName), [themeName]);
   const overlayOpen = Boolean(approval || modelPicker || paletteOpen || fullModeRequest || themePicker);
@@ -38,6 +42,11 @@ export function HuggingCodeApp({ controller }) {
     if (event.type === "full_mode_requested") setFullModeRequest(event);
     if (event.type === "theme_picker_requested") setThemePicker(event);
     if (event.type === "theme_changed") setThemeName(event.theme);
+    if (event.type === "activity") setActivity(event.content);
+    if (event.type === "tool_started") setActivity(`Выполняю: ${event.content}`);
+    if (event.type === "tool_result") setActivity(`Завершено: ${event.tool || "действие"}`);
+    if (event.type === "assistant_final") setActivity("Ответ готов.");
+    if (event.type === "turn_cancelled") setActivity("Выполнение отменено.");
     if (!["approval_requested", "model_picker_requested", "full_mode_requested", "theme_picker_requested"].includes(event.type)) {
       setRows((current) => appendTranscript(current, event));
     }
@@ -57,6 +66,16 @@ export function HuggingCodeApp({ controller }) {
     if (!value) return;
     setInput("");
     setHistory((current) => current.at(-1) === value ? current : [...current, value].slice(-100));
+    const trajectory = value.match(/^\/trajectory(?:\s+(.+))?$/i);
+    if (trajectory) {
+      setView("trajectory");
+      setTrajectoryFilter(trajectory[1] || "");
+      return;
+    }
+    if (value === "/chat") {
+      setView("chat");
+      return;
+    }
     if (value === "/exit" || value === "/quit") {
       controller.close();
       exit();
@@ -109,6 +128,10 @@ export function HuggingCodeApp({ controller }) {
       submit("/theme");
       return;
     }
+    if (key.ctrl && value.toLowerCase() === "j") {
+      setView((current) => current === "chat" ? "trajectory" : "chat");
+      return;
+    }
     if (key.ctrl && value.toLowerCase() === "l") {
       setRows(createTranscript());
     }
@@ -135,11 +158,11 @@ export function HuggingCodeApp({ controller }) {
   }, [controller]);
 
   const maxRows = Math.max(7, terminalRows - (terminalColumns < 70 ? 13 : 12));
-  const status = controller.getStatus({ busy, queueCount: queue.length, goal });
+  const status = { ...controller.getStatus({ busy, queueCount: queue.length, goal }), activity, view };
 
   return h(Box, { flexDirection: "column", width: "100%" },
-    h(HeaderBar, { status, theme, columns: terminalColumns }),
-    h(TranscriptView, { rows, theme, maxRows }),
+    h(HeaderBar, { status, theme, columns: terminalColumns, view }),
+    view === "trajectory" ? h(TrajectoryView, { rows, theme, filter: trajectoryFilter, maxRows }) : h(TranscriptView, { rows, theme, maxRows }),
     approval ? h(PermissionCard, { request: approval, theme, onDecide: (decision) => { controller.resolveApproval(decision); setApproval(null); } }) : null,
     modelPicker ? h(ModelPicker, { models: modelPicker.models, source: modelPicker.source, currentModel: modelPicker.currentModel, theme, onSelect: chooseModel, onClose: () => setModelPicker(null) }) : null,
     themePicker ? h(ThemePicker, { currentTheme: themeName, theme, onSelect: chooseTheme, onClose: () => setThemePicker(null) }) : null,

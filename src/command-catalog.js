@@ -6,6 +6,8 @@ export const COMMAND_CATALOG = [
   { name: "theme", aliases: ["color"], usage: "/theme [название]", title: "Изменить цвет", short: "Открыть выбор цветовой темы или применить название", category: "Интерфейс" },
   { name: "mode", aliases: ["permissions"], usage: "/mode [режим]", title: "Изменить доступ", short: "Выбрать правила подтверждений и автономности", category: "Интерфейс" },
   { name: "status", usage: "/status", title: "Статус сессии", short: "Показать модель, режим, workspace и контекст", category: "Интерфейс" },
+  { name: "trajectory", usage: "/trajectory [поиск]", title: "Открыть Trajectory", short: "Показать последовательность этапов, команд и результатов", category: "Интерфейс" },
+  { name: "chat", usage: "/chat", title: "Вернуться в Chat", short: "Переключиться обратно к разговору с агентом", category: "Интерфейс" },
   { name: "context", usage: "/context", title: "Контекст", short: "Показать размер истории и порог сжатия", category: "Контекст" },
   { name: "compact", usage: "/compact [фокус]", title: "Сжать контекст", short: "Сохранить рабочее резюме вместо длинной истории", category: "Контекст" },
   { name: "clear", aliases: ["new", "reset"], usage: "/clear", title: "Очистить контекст", short: "Начать чистую историю, сохранив текущую сессию", category: "Контекст" },

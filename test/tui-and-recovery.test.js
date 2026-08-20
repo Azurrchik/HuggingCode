@@ -81,3 +81,35 @@ test("обнаруживаются npm проверки проекта", async (
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("trajectory activity показывает этап анализа без скрытого thinking-текста", () => {
+  let rows = createTranscript();
+  rows = appendTranscript(rows, { type: "activity", turnId: "t1", stage: "analysis", content: "Анализирую задачу и готовлю следующий шаг." });
+  rows = appendTranscript(rows, { type: "thinking_delta", turnId: "t1", content: "hidden private reasoning" });
+  assert.equal(rows[0].kind, "activity");
+  assert.equal(rows[1].kind, "activity");
+  assert.doesNotMatch(rows[1].content, /hidden private reasoning/);
+  assert.match(rows[1].content, /Конкретные действия/);
+});
+
+test("CodingAgent заменяет reasoning stream безопасным analysis_started событием", async () => {
+  const events = [];
+  const agent = new CodingAgent({
+    token: "hf_test",
+    model: "example/model",
+    maxTokens: 128,
+    workspace: testWorkspace(),
+    approve: async () => false,
+    onEvent: (event) => events.push(event),
+  });
+  agent.client = {
+    async *chatCompletionStream() {
+      yield { choices: [{ delta: { reasoning_content: "private internal chain" } }] };
+      yield { choices: [{ delta: { content: "Готово" } }] };
+    },
+  };
+  await agent.ask("test", { stream: true });
+  assert.ok(events.some((event) => event.type === "analysis_started"));
+  assert.equal(events.some((event) => event.type === "thinking_delta"), false);
+  assert.equal(events.some((event) => String(event.content || "").includes("private internal chain")), false);
+});

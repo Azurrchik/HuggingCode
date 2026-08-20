@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'none'; img-src 'self' data:" />
+  <title>HuggingCode</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main id="app" class="app">
+    <section id="login" class="login hidden">
+      <div class="login-card">
+        <p class="eyebrow">HUGGINGCODE DESKTOP</p>
+        <h1>Подключите Hugging Face</h1>
+        <p>Токен нужен только для удалённых моделей Hugging Face. Он хранится через системное защищённое хранилище вашей ОС.</p>
+        <label for="token">Fine-grained token с правом Inference Providers</label>
+        <input id="token" type="password" autocomplete="off" placeholder="hf_…" />
+        <button id="login-button" class="primary">Подключить</button>
+        <p id="login-status" class="muted"></p>
+      </div>
+    </section>
+
+    <section id="workspace" class="workspace hidden">
+      <header class="topbar">
+        <div class="brand"><span class="brand-mark">◈</span><strong>HuggingCode</strong><span id="model" class="muted"></span></div>
+        <div class="top-actions"><button id="workspace-button" class="ghost">Папка</button><button id="settings-button" class="ghost">Модель и тема</button><span id="mode" class="mode">manual</span></div>
+      </header>
+      <div class="session-row">
+        <span id="workspace-path" class="muted">workspace</span>
+        <span id="activity" class="activity">Готов к работе.</span>
+      </div>
+      <nav class="tabs" aria-label="Режим просмотра">
+        <button class="tab active" data-view="chat">Chat</button>
+        <button class="tab" data-view="trajectory">Trajectory</button>
+        <div class="tab-spacer"></div>
+        <input id="search" class="search" placeholder="Поиск в Trajectory" />
+      </nav>
+      <section id="chat-view" class="view chat-view"></section>
+      <section id="trajectory-view" class="view trajectory-view hidden"></section>
+      <section id="approval" class="approval hidden"></section>
+      <section id="settings" class="settings hidden"></section>
+      <footer class="composer">
+        <textarea id="prompt" rows="3" placeholder="Опишите задачу. Chat покажет ответ, а Trajectory — последовательность наблюдаемых действий."></textarea>
+        <div class="composer-actions"><span class="muted">Ctrl+Enter отправить · Esc отменить</span><button id="send" class="primary">Отправить</button></div>
+      </footer>
+    </section>
+  </main>
+  <script src="./renderer.js"></script>
+</body>
+</html>

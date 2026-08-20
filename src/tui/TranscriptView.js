@@ -6,7 +6,7 @@ const META = {
   user: { label: "ВЫ", marker: "❯", color: "accent" },
   assistant: { label: "HUGGINGCODE", marker: "●", color: "accent" },
   "assistant-live": { label: "HUGGINGCODE", marker: "◌", color: "accent" },
-  thinking: { label: "РАССУЖДЕНИЕ", marker: "·", color: "muted" },
+  activity: { label: "ХОД РАБОТЫ", marker: "◈", color: "info" },
   tool: { label: "ИНСТРУМЕНТ", marker: "↳", color: "info" },
   "tool-result": { label: "РЕЗУЛЬТАТ", marker: "✓", color: "success" },
   verification: { label: "ПРОВЕРКА", marker: "✓", color: "success" },
@@ -29,14 +29,16 @@ function editPreview(row) {
   const args = row.details;
   if (!args || typeof args !== "object" || Array.isArray(args)) return null;
   if (row.tool === "write_file") {
-    const lines = String(args.content ?? "").split(/\r?\n/).filter(Boolean).slice(0, 4);
-    return [`${args.path || "файл"}`, ...lines.map((line) => `+ ${oneLine(line)}`), args.reason ? `# ${oneLine(args.reason)}` : ""].filter(Boolean).join("\n");
+    const allLines = String(args.content ?? "").split(/\r?\n/).filter(Boolean);
+    const lines = allLines.slice(0, 5);
+    return [`${args.path || "файл"}`, `+ запись ${allLines.length} строк`, ...lines.map((line) => `+ ${oneLine(line)}`), allLines.length > lines.length ? `… ещё ${allLines.length - lines.length} строк в файле` : "", args.reason ? `# причина: ${oneLine(args.reason)}` : ""].filter(Boolean).join("\n");
   }
   if (row.tool === "replace_in_file") {
     return [`${args.path || "файл"}`, `- ${oneLine(args.old_string)}`, `+ ${oneLine(args.new_string)}`, args.replace_all ? "# все совпадения" : ""].filter(Boolean).join("\n");
   }
   if (row.tool === "delete_file") return `${args.path || "файл"}\n× удалить файл`;
-  if (row.tool === "run_command") return `> ${oneLine(args.command, 180)}`;
+  if (row.tool === "run_command") return [`> ${oneLine(args.command, 180)}`, args.reason ? `# причина: ${oneLine(args.reason)}` : ""].filter(Boolean).join("\n");
+  if (args.path || args.query || args.reason) return [args.path ? `путь: ${args.path}` : "", args.query ? `запрос: ${oneLine(args.query)}` : "", args.reason ? `# причина: ${oneLine(args.reason)}` : ""].filter(Boolean).join("\n");
   return null;
 }
 
@@ -56,18 +58,18 @@ function ToolCard({ row, theme, result = false }) {
 
 function MessageCard({ row, theme }) {
   const meta = META[row.kind] || META.notice;
-  const content = transcriptPreview(row, row.kind === "assistant" || row.kind === "assistant-live" ? 18 : row.kind === "thinking" ? 5 : 10);
+  const content = transcriptPreview(row, row.kind === "assistant" || row.kind === "assistant-live" ? Number.POSITIVE_INFINITY : row.kind === "activity" ? 5 : 10);
   const color = colorFor(meta, theme);
   const user = row.kind === "user";
-  const thinking = row.kind === "thinking";
+  const activity = row.kind === "activity";
   return h(Box, { flexDirection: "column", marginBottom: 1, paddingLeft: user ? 1 : 0 },
     h(Box, null,
       h(Text, { color, bold: true }, `${meta.marker} ${meta.label}`),
       row.kind === "assistant-live" ? h(Text, { color: theme.warning }, "  потоковый ответ") : null,
-      thinking ? h(Text, { dimColor: true }, "  краткий preview") : null,
+      activity ? h(Text, { color: theme.muted }, "  действия и результаты ниже") : null,
     ),
-    h(Box, { paddingLeft: 2, borderLeft: true, borderColor: user ? theme.accent : thinking ? theme.border : color },
-      h(Text, { color: thinking ? theme.muted : undefined, dimColor: thinking }, content || "…"),
+    h(Box, { paddingLeft: 2, borderLeft: true, borderColor: user ? theme.accent : activity ? theme.border : color },
+      h(Text, { color: activity ? theme.muted : undefined, dimColor: activity }, content || "…"),
     ),
   );
 }
