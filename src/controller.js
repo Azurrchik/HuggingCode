@@ -3,15 +3,18 @@ import path from "node:path";
 import { CodingAgent } from "./agent.js";
 import { getConfig, PERMISSION_MODES, REASONING_EFFORTS, updateConfig } from "./config.js";
 import { decidePermission } from "./permissions.js";
-import { clearStoredToken } from "./storage.js";
+import { clearStoredToken, getStorageInfo } from "./storage.js";
+import { platformSnapshot } from "./platform.js";
 import { branchSession, createSession, listSessions, loadSession, saveSession, sessionToText } from "./session-store.js";
 import { listSkills, loadSkill } from "./skills.js";
 import { TaskManager } from "./tasks.js";
 import { createWorkspace } from "./workspace.js";
 import { CheckpointStore } from "./checkpoints.js";
 import { detectProjectChecks } from "./verification.js";
+import { fallbackCatalog, fetchModelCatalog, formatModelSelection, searchModels } from "./model-catalog.js";
 
 const MEMORY_FILE = "HUGGINGCODE.md";
+export const FULL_MODE_PHRASE = "ENABLE FULL MODE";
 
 async function memoryFrom(root) {
   try {
@@ -46,11 +49,15 @@ export class HuggingController {
     this.listeners = new Set();
     this.currentTurn = null;
     this.pendingApproval = null;
+    this.pendingFullMode = null;
+    this.runtimePermissionMode = config.permissionMode;
     this.closed = false;
     this.session = null;
     this.checkpoints = checkpoints;
     this.tasks = new TaskManager();
     this.attachments = [];
+    this.modelCatalog = fallbackCatalog();
+    this.modelCatalogSource = "fallback";
     this.workspace.setMutationListener(async (mutation) => {
       if (!this.currentTurn) return;
       await this.checkpoints.record(mutation);
@@ -66,12 +73,36 @@ export class HuggingController {
       model: this.config.model,
       maxTokens: this.config.maxTokens,
       reasoningEffort: this.config.reasoningEffort,
-      permissionMode: this.config.permissionMode,
+      permissionMode: this.runtimePermissionMode,
       workspace: this.workspace,
       memory: this.memory,
       approve: (action) => this.requestApproval(action),
       onEvent: (event) => this.onAgentEvent(event),
     });
+  }
+
+  async refreshModelCatalog({ silent = false } = {}) {
+    try {
+      this.modelCatalog = await fetchModelCatalog(this.token);
+      this.modelCatalogSource = "live";
+      if (!silent) this.emit({ type: "notice", level: "info", content: `Загружен каталог Hugging Face: ${this.modelCatalog.length} моделей.` });
+    } catch (error) {
+      this.modelCatalog = fallbackCatalog();
+      this.modelCatalogSource = "fallback";
+      if (!silent) this.emit({ type: "notice", level: "warn", content: `Каталог моделей временно недоступен; показан встроенный список (${error.message}).` });
+    }
+    return this.modelCatalog;
+  }
+
+  getModelCatalog(query = "", filters = {}) {
+    return searchModels(this.modelCatalog, query, filters);
+  }
+
+  async selectModel(modelId, policy = "fastest") {
+    const model = formatModelSelection(modelId, policy);
+    await this.updateConfig({ model });
+    this.emit({ type: "notice", level: "info", content: `Модель изменена: ${model}` });
+    return model;
   }
 
   async initialize() {
@@ -107,13 +138,13 @@ export class HuggingController {
 
   requestApproval(action) {
     if (this.closed) return Promise.resolve(false);
-    const decision = decidePermission(this.config.permissionMode, action);
+    const decision = decidePermission(this.runtimePermissionMode, action);
     if (decision.decision === "deny") {
       this.emit({ type: "notice", level: "warn", content: decision.reason });
       return Promise.resolve(false);
     }
     if (decision.decision === "allow") {
-      this.emit({ type: "notice", level: "info", content: `Разрешено режимом ${this.config.permissionMode}: ${decision.reason}` });
+      this.emit({ type: "notice", level: "info", content: `Разрешено режимом ${this.runtimePermissionMode}: ${decision.reason}` });
       return Promise.resolve(true);
     }
     return new Promise((resolve) => {
@@ -132,7 +163,7 @@ export class HuggingController {
   getStatus({ busy = false, queueCount = 0, goal = "" } = {}) {
     return {
       model: this.config.model,
-      mode: this.config.permissionMode,
+      mode: this.runtimePermissionMode,
       effort: this.config.reasoningEffort,
       workspace: this.workspace.root,
       context: { ...this.agent.getContextStats(), threshold: this.config.autoCompactThreshold },
@@ -154,11 +185,42 @@ export class HuggingController {
   }
 
   async updateConfig(patch) {
-    this.config = await updateConfig(patch);
+    const { permissionMode, ...persistedPatch } = patch;
+    if (permissionMode === "full") throw new Error("Full mode включается только через typed-подтверждение.");
+    this.config = await updateConfig({ ...persistedPatch, ...(permissionMode ? { permissionMode } : {}) });
+    if (permissionMode) this.runtimePermissionMode = this.config.permissionMode;
     this.agent.setModel(this.config.model);
     this.agent.setReasoningEffort(this.config.reasoningEffort);
-    this.agent.setPermissionMode(this.config.permissionMode);
+    this.agent.setPermissionMode(this.runtimePermissionMode);
     return this.config;
+  }
+
+  requestFullModeActivation() {
+    if (this.closed) return Promise.resolve(false);
+    if (this.runtimePermissionMode === "full") return Promise.resolve(true);
+    return new Promise((resolve) => {
+      this.pendingFullMode = { resolve };
+      this.emit({ type: "full_mode_requested", phrase: FULL_MODE_PHRASE, workspace: this.workspace.root });
+    });
+  }
+
+  confirmFullMode(phrase) {
+    const pending = this.pendingFullMode;
+    if (!pending) return false;
+    if (String(phrase || "").trim() !== FULL_MODE_PHRASE) return false;
+    this.pendingFullMode = null;
+    this.runtimePermissionMode = "full";
+    this.agent.setPermissionMode("full");
+    pending.resolve(true);
+    this.emit({ type: "notice", level: "warn", content: "FULL MODE включён только до закрытия текущего HuggingCode-сеанса." });
+    return true;
+  }
+
+  cancelFullModeActivation() {
+    const pending = this.pendingFullMode;
+    if (!pending) return;
+    this.pendingFullMode = null;
+    pending.resolve(false);
   }
 
   async runSlash(input) {
@@ -166,10 +228,10 @@ export class HuggingController {
     const arg = parts.join(" ").trim();
     switch ((command || "").toLowerCase()) {
       case "help":
-        this.emit({ type: "assistant_final", turnId: this.currentTurn?.id, content: "Команды: /help, /models, /model <id>, /mode <manual|accept-edits|plan|safe-auto>, /context, /compact, /undo, /verify, /sessions, /resume <id>, /branch <name>, /rename <name>, /export <path>, /skills, /skill <name> [args], /attach <path>, /subtask <task>, /tasks, /stop <id>, /clear, /status, /logout, /exit. Используйте Tab для подсказок." });
+        this.emit({ type: "assistant_final", turnId: this.currentTurn?.id, content: "Команды: /help, /models, /model <id>, /mode <manual|accept-edits|plan|safe-auto|full>, /context, /compact, /undo, /verify, /sessions, /resume <id>, /branch <name>, /rename <name>, /export <path>, /skills, /skill <name> [args], /attach <path>, /subtask <task>, /tasks, /stop <id>, /clear, /status, /logout, /exit. Используйте Tab для подсказок." });
         return;
       case "status":
-        this.emit({ type: "assistant_final", turnId: this.currentTurn?.id, content: `Модель: ${this.config.model}\nРежим: ${this.config.permissionMode}\nРабочая область: ${this.workspace.root}` });
+        this.emit({ type: "assistant_final", turnId: this.currentTurn?.id, content: `Модель: ${this.config.model}\nРежим: ${this.runtimePermissionMode}\nРабочая область: ${this.workspace.root}` });
         return;
       case "context": {
         const context = this.agent.getContextStats();
@@ -178,10 +240,11 @@ export class HuggingController {
       }
       case "model":
         if (!arg) {
-          this.emit({ type: "assistant_final", turnId: this.currentTurn?.id, content: `Текущая модель: ${this.config.model}` });
+          await this.refreshModelCatalog({ silent: true });
+          this.emit({ type: "model_picker_requested", models: this.modelCatalog, source: this.modelCatalogSource, currentModel: this.config.model });
         } else {
-          await this.updateConfig({ model: arg });
-          this.emit({ type: "notice", level: "info", content: `Модель изменена: ${this.config.model}` });
+          const [modelId, policy] = parts;
+          await this.selectModel(modelId, policy || "fastest");
         }
         return;
       case "effort":
@@ -205,9 +268,12 @@ export class HuggingController {
       case "mode":
       case "permissions":
         if (!arg) {
-          this.emit({ type: "assistant_final", turnId: this.currentTurn?.id, content: `Режим: ${this.config.permissionMode}. Доступно: ${PERMISSION_MODES.join(", ")}.` });
+          this.emit({ type: "assistant_final", turnId: this.currentTurn?.id, content: `Режим: ${this.runtimePermissionMode}. Доступно: ${PERMISSION_MODES.join(", ")}.` });
         } else if (!PERMISSION_MODES.includes(arg)) {
           this.emit({ type: "error", turnId: this.currentTurn?.id, content: `Неизвестный режим: ${arg}` });
+        } else if (arg === "full") {
+          const enabled = await this.requestFullModeActivation();
+          if (!enabled) this.emit({ type: "notice", level: "info", content: "Full mode не включён." });
         } else {
           await this.updateConfig({ permissionMode: arg });
           this.emit({ type: "notice", level: "info", content: `Режим разрешений: ${arg}` });
@@ -319,7 +385,9 @@ export class HuggingController {
         return;
       }
       case "models": {
-        this.emit({ type: "assistant_final", turnId: this.currentTurn?.id, content: "Рекомендованные Hugging Face coding models:\n• openai/gpt-oss-120b:fastest — tool calling, быстрый режим\n• Qwen/Qwen3-Coder-480B-A35B-Instruct:fastest — coding\n• zai-org/GLM-4.5:fastest — general reasoning\n• Qwen/Qwen2.5-VL-3B-Instruct:fastest — vision-capable\n\nВыберите: /model <идентификатор>. Доступность зависит от токена и Inference Provider." });
+        await this.refreshModelCatalog();
+        const models = this.getModelCatalog(arg, { code: true }).slice(0, 20);
+        this.emit({ type: "assistant_final", turnId: this.currentTurn?.id, content: models.map((model) => `${model.id}\n${model.label} · ${model.tags.join(", ") || "chat"}${model.contextLength ? ` · ctx ${model.contextLength.toLocaleString()}` : ""}`).join("\n\n") || "Модели не найдены." });
         return;
       }
       case "subtask": {
@@ -342,12 +410,17 @@ export class HuggingController {
       case "doctor": {
         const checkpoints = await this.checkpoints.list();
         const skills = await listSkills(this.workspace.root);
+        const platform = platformSnapshot();
+        const storage = getStorageInfo();
         this.emit({ type: "assistant_final", turnId: this.currentTurn?.id, content: [
           "HuggingCode doctor",
+          `Platform: ${platform.label}`,
+          `Shell: ${platform.shell}`,
+          `Credential store: ${storage.label}${storage.sessionOnly ? " (session-only)" : ""}`,
           `Node.js: ${process.version}`,
           `Workspace: ${this.workspace.root}`,
           `Model: ${this.config.model}`,
-          `Mode: ${this.config.permissionMode}`,
+          `Mode: ${this.runtimePermissionMode}`,
           `Effort: ${this.config.reasoningEffort}`,
           `Context: ~${this.agent.getContextStats().estimatedTokens} tokens`,
           `Checkpoints: ${checkpoints.length}`,
@@ -412,5 +485,6 @@ export class HuggingController {
     this.closed = true;
     if (this.currentTurn) this.currentTurn.abort.abort();
     this.resolveApproval("deny");
+    this.cancelFullModeActivation();
   }
 }

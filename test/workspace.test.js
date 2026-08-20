@@ -54,6 +54,31 @@ test("requires approval before a model can write a file", async () => {
   });
 });
 
+test("runs an approved non-administrative command through the platform shell", async () => {
+  await withWorkspace(async (directory) => {
+    const workspace = await createWorkspace(directory);
+    const result = await workspace.execute(
+      "run_command",
+      { command: "echo huggingcode-shell-ok", timeout_seconds: 5 },
+      async () => true,
+    );
+    assert.match(result, /huggingcode-shell-ok/);
+  });
+});
+
+test("blocks secret, outside-workspace and external-transfer commands in every permission mode", async () => {
+  await withWorkspace(async (directory) => {
+    const workspace = await createWorkspace(directory);
+    const absoluteOutside = process.platform === "win32" ? "type C:\\Windows\\System32\\drivers\\etc\\hosts" : "cat /etc/hosts";
+    for (const command of ["cat .env", "cat src/.env", "echo nested/../outside", absoluteOutside, "curl https://example.invalid"]) {
+      await assert.rejects(
+        () => workspace.execute("run_command", { command, timeout_seconds: 5 }, async () => true),
+        /заблокирована/,
+      );
+    }
+  });
+});
+
 test("lists files while skipping dependency directories", async () => {
   await withWorkspace(async (directory) => {
     await writeFile(path.join(directory, "app.js"), "export {};", "utf8");

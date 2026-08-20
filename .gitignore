@@ -11,3 +11,4 @@ build/
 # Local release artifacts
 *.tgz
 *.zip
+*.tar

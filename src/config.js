@@ -7,7 +7,7 @@ export const DEFAULT_MAX_TOKENS = 4096;
 export const DEFAULT_PERMISSION_MODE = "manual";
 export const DEFAULT_REASONING_EFFORT = "medium";
 export const DEFAULT_AUTO_COMPACT_THRESHOLD = 48_000;
-export const PERMISSION_MODES = ["manual", "accept-edits", "plan", "safe-auto"];
+export const PERMISSION_MODES = ["manual", "accept-edits", "plan", "safe-auto", "full"];
 export const REASONING_EFFORTS = ["auto", "none", "minimal", "low", "medium", "high", "xhigh"];
 
 function configDirectory() {
@@ -29,7 +29,7 @@ function normalizeConfig(stored = {}) {
   return {
     model: typeof stored.model === "string" && stored.model.trim() ? stored.model.trim() : DEFAULT_MODEL,
     maxTokens: integerOr(stored.maxTokens, DEFAULT_MAX_TOKENS, 256, 32_768),
-    permissionMode: PERMISSION_MODES.includes(stored.permissionMode) ? stored.permissionMode : DEFAULT_PERMISSION_MODE,
+    permissionMode: PERMISSION_MODES.includes(stored.permissionMode) && stored.permissionMode !== "full" ? stored.permissionMode : DEFAULT_PERMISSION_MODE,
     reasoningEffort: REASONING_EFFORTS.includes(stored.reasoningEffort) ? stored.reasoningEffort : DEFAULT_REASONING_EFFORT,
     autoCompactThreshold: integerOr(stored.autoCompactThreshold, DEFAULT_AUTO_COMPACT_THRESHOLD, 4_000, 1_000_000),
     theme: typeof stored.theme === "string" && stored.theme.trim() ? stored.theme.trim() : "orange",

@@ -1,39 +1,44 @@
 import React, { createElement as h, useEffect, useMemo, useRef, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import TextInput from "ink-text-input";
 
 const COMMANDS = [
-  ["help", "справка"], ["models", "каталог HF моделей"], ["model", "выбрать модель"], ["effort", "reasoning effort"], ["theme", "сменить тему"], ["mode", "сменить режим"],
-  ["context", "состояние контекста"], ["compact", "сжать контекст"], ["undo", "откатить правки агента"],
-  ["verify", "lint, typecheck и test"], ["sessions", "поиск сессий"], ["resume", "восстановить сессию"],
-  ["branch", "ветка сессии"], ["rename", "переименовать сессию"], ["export", "экспорт Markdown"],
-  ["skills", "список навыков"], ["skill", "запустить навык"], ["attach", "вложить текстовый файл"],
-  ["subtask", "локальная подзадача"], ["tasks", "статус подзадач"], ["stop", "остановить подзадачу"],
-  ["status", "состояние"], ["doctor", "диагностика"], ["clear", "очистить контекст"], ["logout", "удалить токен"], ["exit", "выйти"],
+  ["help", "all commands"], ["model", "select a Hugging Face model"], ["models", "print coding model catalog"], ["mode", "change permission mode"], ["full", "autonomous mode is available through /mode full"],
+  ["context", "inspect context"], ["compact", "summarize context"], ["undo", "restore latest agent checkpoint"], ["verify", "run project checks"],
+  ["sessions", "browse sessions"], ["resume", "restore a session"], ["branch", "branch session"], ["export", "export Markdown"],
+  ["skills", "project skills"], ["attach", "attach text file"], ["subtask", "start side task"], ["tasks", "side task status"],
+  ["doctor", "diagnostics"], ["clear", "clear transcript"], ["logout", "remove token"], ["exit", "quit"],
 ];
+
+function printable(input, key) {
+  return input && !key.ctrl && !key.meta && !key.escape && !key.return && !key.tab;
+}
 
 export function PromptInput({ value, onChange, onSubmit, disabled = false, pending = 0, history = [], theme, onCancel }) {
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [historyIndex, setHistoryIndex] = useState(null);
   const draft = useRef("");
-  const query = value.startsWith("/") ? value.slice(1).toLowerCase() : "";
-  const suggestions = useMemo(() => query ? COMMANDS.filter(([command]) => command.startsWith(query)) : [], [query]);
+  const query = value.startsWith("/") && !value.includes("\n") ? value.slice(1).toLowerCase() : "";
+  const suggestions = useMemo(() => query ? COMMANDS.filter(([command]) => command.startsWith(query)).slice(0, 6) : [], [query]);
 
-  useEffect(() => setSuggestionIndex(0), [value]);
+  useEffect(() => setSuggestionIndex(0), [query]);
+
+  const submit = () => {
+    const text = value.trim();
+    if (!text) return;
+    setHistoryIndex(null);
+    draft.current = "";
+    onSubmit(text);
+  };
 
   useInput((input, key) => {
-    if (key.escape) {
-      onCancel?.();
-      return;
+    if (disabled) return;
+    if (key.escape) return onCancel?.();
+    if (key.return) {
+      if (key.shift) return onChange(`${value}\n`);
+      return submit();
     }
-    if (suggestions.length && key.upArrow) {
-      setSuggestionIndex((index) => Math.max(0, index - 1));
-      return;
-    }
-    if (suggestions.length && key.downArrow) {
-      setSuggestionIndex((index) => Math.min(suggestions.length - 1, index + 1));
-      return;
-    }
+    if (suggestions.length && key.upArrow) return setSuggestionIndex((index) => Math.max(0, index - 1));
+    if (suggestions.length && key.downArrow) return setSuggestionIndex((index) => Math.min(suggestions.length - 1, index + 1));
     if (suggestions.length && key.tab) {
       const selected = suggestions[suggestionIndex];
       if (selected) onChange(`/${selected[0]} `);
@@ -60,30 +65,31 @@ export function PromptInput({ value, onChange, onSubmit, disabled = false, pendi
         }
       }
       if (next !== undefined) onChange(next);
+      return;
     }
+    if (key.backspace || key.delete) return onChange(value.slice(0, -1));
+    if (printable(input, key)) onChange(`${value}${input}`);
   }, { isActive: !disabled });
 
-  const submit = (input) => {
-    const text = input.trim();
-    if (!text) return;
-    setHistoryIndex(null);
-    draft.current = "";
-    onSubmit(text);
-  };
-
+  const lines = value.split("\n");
   return h(Box, { flexDirection: "column", paddingX: 1, paddingBottom: 1 },
-    h(Box, { borderStyle: "round", borderColor: disabled ? theme.warning : theme.accent, paddingX: 1 },
-      h(Text, { color: theme.accent, bold: true }, "› "),
-      h(TextInput, { value, onChange, onSubmit: submit, placeholder: "Опишите задачу или введите / для команд", focus: !disabled }),
-      pending > 0 ? h(Text, { color: theme.info }, ` · очередь: ${pending}`) : null,
+    h(Box, { borderStyle: "round", borderColor: disabled ? theme.warning : theme.accent, paddingX: 1, flexDirection: "column" },
+      h(Box, null,
+        h(Text, { color: theme.accent, bold: true }, "❯ "),
+        h(Text, { color: value ? undefined : theme.muted }, value ? "" : "Describe a task, use / for actions, or Ctrl+P for palette"),
+        pending > 0 ? h(Text, { color: theme.info }, `  queue ${pending}`) : null,
+      ),
+      value ? h(Box, { flexDirection: "column", paddingLeft: 2 }, lines.map((line, index) => h(Text, { key: `${index}-${line}` }, index === lines.length - 1 ? `${line}▍` : line || " "))) : null,
     ),
     suggestions.length > 0 ? h(Box, { marginLeft: 2, flexDirection: "column" },
-      suggestions.slice(0, 6).map(([command, label], index) => h(Text, { key: command, color: index === suggestionIndex ? theme.accent : theme.muted },
+      suggestions.map(([command, label], index) => h(Text, { key: command, color: index === suggestionIndex ? theme.accent : theme.muted },
         `${index === suggestionIndex ? "›" : " "} /${command} `,
         h(Text, { dimColor: true }, `— ${label}`),
       )),
-      h(Text, { dimColor: true }, "Tab — дополнить · ↑/↓ — выбрать · Esc — отменить"),
     ) : null,
-    disabled ? h(Text, { color: theme.muted }, "  Введите следующее сообщение: оно будет поставлено в очередь.") : null,
+    h(Box, { marginLeft: 1 },
+      h(Text, { dimColor: true }, "Enter send · Shift+Enter newline · ↑/↓ history · Tab complete · Ctrl+M models · Ctrl+P palette · Esc cancel"),
+    ),
+    disabled ? h(Text, { color: theme.warning }, "  An overlay is active. Esc closes or cancels it.") : null,
   );
 }

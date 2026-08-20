@@ -1,7 +1,7 @@
 import React, { createElement as h } from "react";
 import { render } from "ink";
 import * as p from "@clack/prompts";
-import { getStoredToken, saveToken } from "../storage.js";
+import { getStorageInfo, getStoredToken, saveToken } from "../storage.js";
 import { verifyHuggingFaceToken } from "../agent.js";
 import { HuggingController } from "../controller.js";
 import { HuggingCodeApp } from "./App.js";
@@ -18,7 +18,11 @@ function cancelled(value) {
 
 async function requestToken() {
   p.intro("HuggingCode — подключение Hugging Face");
-  p.note(`Создайте fine-grained token с правом “Make calls to Inference Providers”.\n${TOKEN_URL}\n\nТокен будет зашифрован Windows DPAPI и привязан к вашей учётной записи.`, "Первый запуск");
+  const storage = getStorageInfo();
+  const storageNote = storage.persistent
+    ? `Токен будет сохранён через ${storage.label} и привязан к текущей учётной записи.`
+    : "Системное защищённое хранилище не поддерживается; токен будет доступен только до закрытия приложения.";
+  p.note(`Создайте fine-grained token с правом “Make calls to Inference Providers”.\n${TOKEN_URL}\n\n${storageNote}`, "Первый запуск");
   while (true) {
     const token = cancelled(await p.password({
       message: "Вставьте токен Hugging Face",
@@ -31,8 +35,9 @@ async function requestToken() {
     spinner.start("Проверяю токен");
     try {
       const account = await verifyHuggingFaceToken(token.trim());
-      await saveToken(token.trim());
-      spinner.stop(`Токен принят для ${account}.`);
+      const storage = await saveToken(token.trim());
+      spinner.stop(storage.persistent ? `Токен принят для ${account} и сохранён в ${storage.backend}.` : `Токен принят для ${account}; он будет доступен только до закрытия приложения.`);
+      if (storage.warning) p.log.warn(storage.warning);
       return token.trim();
     } catch (error) {
       spinner.stop("Токен не сохранён.");

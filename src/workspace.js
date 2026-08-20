@@ -3,12 +3,16 @@ import { promisify } from "node:util";
 import { mkdir, readdir, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { diffLines } from "diff";
+import { shellAdapter } from "./platform.js";
 
 const execFileAsync = promisify(execFile);
 const MAX_FILE_BYTES = 200_000;
 const MAX_OUTPUT_CHARS = 30_000;
 const IGNORED_DIRECTORIES = new Set([".git", "node_modules", "dist", "build", ".next", ".cache", "coverage"]);
 const SECRET_FILE = /(^|[\\/])(?:\.env(?:\..+)?|\.npmrc|\.pypirc|id_rsa|id_ed25519|credentials(?:\.json)?|.*\.(?:pem|key|pfx|p12))$/i;
+const OUTSIDE_PATH_REFERENCE = /(?:^|[\\/])\.\.(?:[\\/]|$)|^[A-Za-z]:[\\/]|^\\\\|^~[\\/]/;
+const HOME_VARIABLE_REFERENCE = /(?:\$env:(?:home|userprofile|appdata|localappdata|xdg_config_home)|%(?:home|userprofile|appdata|localappdata|temp)%|\$(?:HOME|USERPROFILE|APPDATA|XDG_CONFIG_HOME))/i;
+const UNSANDBOXED_COMMAND = /(?:^|[\s;&|])(?:curl|wget|invoke-webrequest|iwr|irm|scp|sftp|ssh|ftp|nc|ncat|certutil|node\s+-e|python(?:3)?\s+-c|powershell(?:\.exe)?\s+.*(?:-command|-encodedcommand)|(?:cmd(?:\.exe)?|bash|sh)\s+(?:\/c|-c))(?:$|[\s;&|])/i;
 
 const toolDefinitions = [
   {
@@ -153,6 +157,27 @@ function truncate(value, limit = MAX_OUTPUT_CHARS) {
 
 function isSecretPath(label) {
   return SECRET_FILE.test(label.replaceAll("\\", "/"));
+}
+
+function commandTokens(command) {
+  return String(command || "").split(/[\s"'`]+/).map((token) => token.replace(/^[([{]+|[)\]},;]+$/g, "")).filter(Boolean);
+}
+
+function isOutsideWorkspaceToken(token) {
+  if (OUTSIDE_PATH_REFERENCE.test(token)) return true;
+  return process.platform !== "win32" && token.startsWith("/");
+}
+
+function assertCommandScope(command) {
+  const value = String(command || "").trim();
+  const tokens = commandTokens(value);
+  if (tokens.some((token) => isSecretPath(token))) throw new Error("Команда ссылается на секретный файл и заблокирована во всех режимах.");
+  if (tokens.some(isOutsideWorkspaceToken) || HOME_VARIABLE_REFERENCE.test(value)) {
+    throw new Error("Команда ссылается на путь вне выбранной рабочей области и заблокирована во всех режимах.");
+  }
+  if (UNSANDBOXED_COMMAND.test(value)) {
+    throw new Error("Команда может обойти границы workspace или передать данные во внешнюю сеть и заблокирована во всех режимах.");
+  }
 }
 
 async function statIfExists(target) {
@@ -398,12 +423,14 @@ export async function createWorkspace(workspacePath = process.cwd(), addedDirect
 
   async function runCommand(command, timeoutSeconds = 30) {
     if (typeof command !== "string" || !command.trim()) throw new Error("Команда не может быть пустой.");
+    assertCommandScope(command);
     const timeout = Math.max(1, Math.min(Number(timeoutSeconds) || 30, 120)) * 1000;
+    const shell = shellAdapter();
     try {
-      const { stdout, stderr } = await execFileAsync("cmd.exe", ["/d", "/s", "/c", command], {
+      const { stdout, stderr } = await execFileAsync(shell.executable, shell.argumentsFor(command), {
         cwd: primaryRoot,
         timeout,
-        windowsHide: false,
+        windowsHide: process.platform === "win32",
         maxBuffer: 1024 * 1024,
       });
       return truncate([stdout, stderr].filter(Boolean).join("\n").trim() || "Command completed successfully.");

@@ -47,9 +47,9 @@ export function appendTranscript(rows, event) {
       return [...current, makeRow("assistant", event.content, { turnId: event.turnId })];
     }
     case "tool_started":
-      return [...current, makeRow("tool", event.content || event.tool || "Инструмент", { turnId: event.turnId, details: event.details })];
+      return [...current, makeRow("tool", event.content || event.tool || "Инструмент", { turnId: event.turnId, tool: event.tool, details: event.details })];
     case "tool_result":
-      return [...current, makeRow("tool-result", event.content || "Инструмент завершён.", { turnId: event.turnId, details: event.details })];
+      return [...current, makeRow("tool-result", event.content || "Инструмент завершён.", { turnId: event.turnId, tool: event.tool, details: event.details })];
     case "verification":
       return [...current, makeRow("verification", event.content, { turnId: event.turnId, details: event.details })];
     case "notice":
