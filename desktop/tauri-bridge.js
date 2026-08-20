@@ -1,8 +1,18 @@
+import { existsSync } from "node:fs";
 import readline from "node:readline";
-import { HuggingController } from "../src/controller.js";
-import { verifyHuggingFaceToken } from "../src/agent.js";
-import { getStoredToken, saveToken } from "../src/storage.js";
-import { THEME_OPTIONS, normalizeTheme } from "../src/tui/theme.js";
+
+const sourceRoot = existsSync(new URL("./src/controller.js", import.meta.url)) ? "./src" : "../src";
+const [
+  { HuggingController },
+  { verifyHuggingFaceToken },
+  { getStoredToken, saveToken },
+  { THEME_OPTIONS, normalizeTheme },
+] = await Promise.all([
+  import(`${sourceRoot}/controller.js`),
+  import(`${sourceRoot}/agent.js`),
+  import(`${sourceRoot}/storage.js`),
+  import(`${sourceRoot}/tui/theme.js`),
+]);
 
 let controller;
 let workspaceRoot = process.cwd();

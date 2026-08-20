@@ -21,23 +21,38 @@ struct BridgeState {
 
 impl BridgeState {
     fn start(app: AppHandle) -> Result<Self, String> {
-    let development_root = std::env::var("HUGGINGCODE_ROOT")
-      .map(PathBuf::from)
-      .unwrap_or_else(|_| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
-    let development_bridge = development_root.join("desktop").join("tauri-bridge.js");
-    let resource_root = app.path().resource_dir().ok();
-    let bundled_bridge = resource_root.as_ref().map(|root| root.join("tauri-bridge.js"));
-    let (root, bridge) = if development_bridge.exists() {
-      (development_root, development_bridge)
-    } else if let Some(bridge) = bundled_bridge.filter(|path| path.exists()) {
-      (resource_root.unwrap_or_else(|| PathBuf::from(".")), bridge)
-    } else {
-      return Err("Не найден локальный HuggingCode bridge в исходниках или bundled resources.".to_string());
-    };
-        let bundled_node = root.join("runtime").join(if cfg!(target_os = "windows") { "node.exe" } else { "node" });
+        let development_root = std::env::var("HUGGINGCODE_ROOT")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
+        let development_bridge = development_root.join("desktop").join("tauri-bridge.js");
+        let resource_root = app.path().resource_dir().ok();
+        let bundled_bridge = resource_root
+            .as_ref()
+            .map(|root| root.join("desktop").join("tauri-bridge.js"));
+        let (root, bridge) = if development_bridge.exists() {
+            (development_root, development_bridge)
+        } else if let Some(bridge) = bundled_bridge.filter(|path| path.exists()) {
+            (resource_root.unwrap_or_else(|| PathBuf::from(".")), bridge)
+        } else {
+            return Err(
+                "Не найден локальный HuggingCode bridge в исходниках или bundled resources."
+                    .to_string(),
+            );
+        };
+        let bundled_node = root.join("runtime").join(if cfg!(target_os = "windows") {
+            "node.exe"
+        } else {
+            "node"
+        });
         let node = std::env::var("HUGGINGCODE_NODE")
             .map(PathBuf::from)
-            .unwrap_or_else(|_| if bundled_node.exists() { bundled_node } else { PathBuf::from("node") });
+            .unwrap_or_else(|_| {
+                if bundled_node.exists() {
+                    bundled_node
+                } else {
+                    PathBuf::from("node")
+                }
+            });
         let mut child = Command::new(node)
             .arg(bridge)
             .current_dir(root)

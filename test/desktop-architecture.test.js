@@ -21,9 +21,9 @@ test("desktop scripts use Tauri 2 rather than Electron", async () => {
 test("Tauri config bundles the safe local controller bridge and source modules", async () => {
   const config = JSON.parse(await text("desktop/tauri/tauri.conf.json"));
   assert.equal(config.app.withGlobalTauri, true);
-  assert.equal(config.bundle.resources["../tauri-bridge.js"], "tauri-bridge.js");
+  assert.equal(config.bundle.resources["../tauri-bridge.js"], "desktop/tauri-bridge.js");
   assert.equal(config.bundle.resources["../../src"], "src");
-  assert.equal(config.bundle.resources["../runtime"], "runtime");
+  assert.equal(config.bundle.resources.runtime, "runtime");
 });
 
 test("desktop trajectory renderer exposes observed events but has no raw thinking display", async () => {
@@ -34,4 +34,6 @@ test("desktop trajectory renderer exposes observed events but has no raw thinkin
   assert.match(renderer, /tauri\.core\.invoke\("bridge_call"/);
   assert.doesNotMatch(bridge, /thinking_delta/);
   assert.match(bridge, /"activity"/);
+  assert.match(bridge, /const sourceRoot = existsSync/);
+  assert.match(bridge, /import\(`\$\{sourceRoot\}\/controller\.js`\)/);
 });
