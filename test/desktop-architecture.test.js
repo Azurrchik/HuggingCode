@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 
@@ -24,6 +24,11 @@ test("Tauri config bundles the safe local controller bridge and source modules",
   assert.equal(config.bundle.resources["../tauri-bridge.js"], "desktop/tauri-bridge.js");
   assert.equal(config.bundle.resources["../../src"], "src");
   assert.equal(config.bundle.resources.runtime, "runtime");
+});
+
+test("Tauri default app icon is present for native package builds", async () => {
+  const icon = await stat(path.join(root, "desktop/tauri/icons/icon.png"));
+  assert.ok(icon.size > 0);
 });
 
 test("desktop trajectory renderer exposes observed events but has no raw thinking display", async () => {
