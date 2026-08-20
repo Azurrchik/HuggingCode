@@ -9,6 +9,18 @@ async function text(relative) {
   return readFile(path.join(root, relative), "utf8");
 }
 
+test("release version is synchronized between the CLI and desktop packages", async () => {
+  const manifest = JSON.parse(await text("package.json"));
+  const tauriConfig = JSON.parse(await text("desktop/tauri/tauri.conf.json"));
+  const cargo = await text("desktop/tauri/Cargo.toml");
+  const cli = await text("bin/huggingcode.js");
+  const escaped = manifest.version.replaceAll(".", "\\.");
+
+  assert.equal(tauriConfig.version, manifest.version);
+  assert.match(cargo, new RegExp(`version = "${escaped}"`));
+  assert.match(cli, new RegExp(`\\.version\\("${escaped}"\\)`));
+});
+
 test("desktop scripts use Tauri 2 rather than Electron", async () => {
   const manifest = JSON.parse(await text("package.json"));
   assert.match(manifest.scripts.desktop, /^tauri dev/);

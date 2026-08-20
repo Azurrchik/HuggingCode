@@ -1,6 +1,6 @@
 {
   "name": "huggingcode",
-  "version": "0.5.0",
+  "version": "1.0.0",
   "description": "Cross-platform Hugging Face coding agent with keyboard-first TUI, safe trajectory, secure token storage, and Tauri desktop app.",
   "type": "module",
   "bin": {
