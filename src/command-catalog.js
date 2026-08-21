@@ -1,7 +1,7 @@
 export const COMMAND_CATALOG = [
   { name: "help", usage: "/help [команда]", title: "Справка", short: "Показать все команды или описание одной команды", category: "Навигация" },
-  { name: "model", usage: "/model [ID] [policy]", title: "Выбрать модель", short: "Открыть список Hugging Face моделей или переключить модель", category: "Модель" },
-  { name: "models", usage: "/models [поиск]", title: "Показать модели", short: "Вывести coding-модели из каталога", category: "Модель" },
+  { name: "model", usage: "/model [ID] [policy]", title: "Выбрать модель", short: "Открыть live-каталог текущего провайдера или переключить модель", category: "Модель" },
+  { name: "models", usage: "/models [поиск]", title: "Показать модели", short: "Загрузить и вывести модели текущего провайдера", category: "Модель" },
   { name: "effort", usage: "/effort [уровень]", title: "Настроить reasoning", short: "Изменить глубину рассуждения выбранной модели", category: "Модель" },
   { name: "theme", aliases: ["color"], usage: "/theme [название]", title: "Изменить цвет", short: "Открыть выбор цветовой темы или применить название", category: "Интерфейс" },
   { name: "mode", aliases: ["permissions"], usage: "/mode [режим]", title: "Изменить доступ", short: "Выбрать правила подтверждений и автономности", category: "Интерфейс" },
@@ -32,7 +32,7 @@ export const COMMAND_CATALOG = [
   { name: "tasks", aliases: ["agents"], usage: "/tasks", title: "Подзадачи", short: "Показать состояние локальных исследовательских задач", category: "Расширения" },
   { name: "stop", usage: "/stop <ID>", title: "Остановить подзадачу", short: "Не принимать результат выбранной локальной задачи", category: "Расширения" },
   { name: "doctor", aliases: ["checkup"], usage: "/doctor", title: "Диагностика", short: "Проверить платформу, хранилище, workspace и настройки", category: "Сервис" },
-  { name: "logout", usage: "/logout", title: "Удалить токен", short: "Удалить защищённо сохранённый Hugging Face токен", category: "Сервис" },
+  { name: "logout", usage: "/logout", title: "Удалить ключ", short: "Удалить защищённо сохранённый ключ текущего провайдера", category: "Сервис" },
   { name: "exit", aliases: ["quit"], usage: "/exit", title: "Выйти", short: "Завершить HuggingCode", category: "Сервис" },
 ];
 

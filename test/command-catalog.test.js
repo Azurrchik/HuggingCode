@@ -7,7 +7,7 @@ test("command catalog находит команды и алиасы с поня�
   assert.equal(findCommand("color").name, "theme");
   assert.equal(findCommand("run").name, "verify");
   assert.equal(findCommand("missing"), null);
-  assert.match(formatHelp("model"), /Открыть список Hugging Face моделей/);
+  assert.match(formatHelp("model"), /Открыть live-каталог текущего провайдера/);
   assert.match(formatHelp("color"), /Альтернативы: \/color/);
   assert.match(formatHelp(), /Модель/);
   assert.match(formatHelp(), /Проект/);

@@ -1,6 +1,6 @@
 {
   "name": "huggingcode",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "Cross-platform multi-provider coding agent with safe trajectory, secure key storage, token economy, and Tauri desktop app.",
   "type": "module",
   "bin": {

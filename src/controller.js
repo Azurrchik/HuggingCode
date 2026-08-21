@@ -3,7 +3,7 @@ import path from "node:path";
 import { CodingAgent } from "./agent.js";
 import { getConfig, PERMISSION_MODES, REASONING_EFFORTS, updateConfig } from "./config.js";
 import { decidePermission } from "./permissions.js";
-import { clearStoredToken, getStorageInfo } from "./storage.js";
+import { clearProviderToken, getStorageInfo } from "./storage.js";
 import { platformSnapshot } from "./platform.js";
 import { branchSession, createSession, listSessions, loadSession, saveSession, sessionToText } from "./session-store.js";
 import { listSkills, loadSkill } from "./skills.js";
@@ -526,10 +526,12 @@ export class HuggingController {
         ].join("\n") });
         return;
       }
-      case "logout":
-        await clearStoredToken();
-        this.emit({ type: "notice", level: "warn", content: "Токен удалён. Перезапустите HuggingCode для нового входа." });
+      case "logout": {
+        const provider = normalizeProvider(this.config.provider, this.config.providerEndpoint);
+        await clearProviderToken(provider.id);
+        this.emit({ type: "notice", level: "warn", content: `Ключ ${provider.label} удалён. Перезапустите HuggingCode для нового входа.` });
         return;
+      }
       default: {
         const skills = await listSkills(this.workspace.root);
         const shortcut = skills.find((skill) => skill.name === String(command || "").toLowerCase());

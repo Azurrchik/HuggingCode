@@ -105,7 +105,7 @@ test("controller выводит контекстную /help-справку и �
 
   await controller.runSlash("/help model");
   assert.equal(events.at(-1).type, "assistant_final");
-  assert.match(events.at(-1).content, /Открыть список Hugging Face моделей/);
+  assert.match(events.at(-1).content, /Открыть live-каталог текущего провайдера/);
 
   await controller.runSlash("/theme");
   assert.equal(events.at(-1).type, "theme_picker_requested");

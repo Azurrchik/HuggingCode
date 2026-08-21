@@ -83,7 +83,7 @@ export function PromptInput({ value, onChange, onSubmit, disabled = false, pendi
       )),
     ) : null,
     h(Box, { marginLeft: 1 },
-      h(Text, { dimColor: true }, "Enter отправить · Shift+Enter строка · ↑/↓ история · Tab дополнить · Ctrl+M модели · Ctrl+P палитра · Esc отменить"),
+      h(Text, { dimColor: true }, "Enter отправить · Shift+Enter строка · ↑/↓ история · Tab дополнить · Ctrl+M/Ctrl+O модели · Ctrl+P меню · Esc отменить"),
     ),
     disabled ? h(Text, { color: theme.warning }, "  Открыто окно выбора. Esc закрывает или отменяет его.") : null,
   );

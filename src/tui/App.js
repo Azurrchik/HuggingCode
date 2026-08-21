@@ -25,13 +25,13 @@ export function HuggingCodeApp({ controller }) {
   const queueRef = useRef([]);
   const [approval, setApproval] = useState(null);
   const [modelPicker, setModelPicker] = useState(null);
-  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(true);
   const [fullModeRequest, setFullModeRequest] = useState(null);
   const [themePicker, setThemePicker] = useState(null);
   const [goal, setGoal] = useState("");
   const [view, setView] = useState("chat");
   const [trajectoryFilter, setTrajectoryFilter] = useState("");
-  const [activity, setActivity] = useState("Готов к работе.");
+  const [activity, setActivity] = useState("Выберите действие в главном меню или закройте его клавишей Esc.");
   const [themeName, setThemeName] = useState(controller.config.theme);
   const { colors: theme } = useMemo(() => resolveTheme(themeName), [themeName]);
   const overlayOpen = Boolean(approval || modelPicker || paletteOpen || fullModeRequest || themePicker);
@@ -116,7 +116,7 @@ export function HuggingCodeApp({ controller }) {
       return;
     }
     if (overlayOpen) return;
-    if (key.ctrl && value.toLowerCase() === "m") {
+    if (key.ctrl && (value.toLowerCase() === "m" || value.toLowerCase() === "o" || key.return)) {
       submit("/model");
       return;
     }

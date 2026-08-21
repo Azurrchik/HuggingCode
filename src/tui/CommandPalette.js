@@ -25,7 +25,8 @@ export function CommandPalette({ theme, onExecute, onClose }) {
   };
 
   return h(Box, { borderStyle: "double", borderColor: theme.accent, flexDirection: "column", paddingX: 1, marginX: 1 },
-    h(Text, { color: theme.accent, bold: true }, "Палитра команд"),
+    h(Text, { color: theme.accent, bold: true }, "Главное меню HuggingCode"),
+    h(Text, { color: theme.muted }, "Выберите действие для старта или нажмите Esc, чтобы перейти к диалогу."),
     h(Box, { borderStyle: "round", borderColor: theme.border, paddingX: 1, marginTop: 1 },
       h(Text, { color: theme.muted }, "⌘  "),
       h(TextInput, { value: query, onChange: (value) => { setQuery(value); setIndex(0); }, onSubmit: submit, placeholder: "Найти действие" }),
@@ -37,6 +38,6 @@ export function CommandPalette({ theme, onExecute, onClose }) {
       )),
       !visible.length ? h(Text, { color: theme.warning }, "Совпадений не найдено.") : null,
     ),
-    h(Text, { dimColor: true }, "↑/↓ выбор · Enter выполнить · Esc закрыть"),
+    h(Text, { dimColor: true }, "↑/↓ выбор · Enter выполнить · Esc перейти к диалогу"),
   );
 }
