@@ -16,11 +16,12 @@ test("provider presets include Hugging Face and OpenAI-compatible choices", () =
   assert.equal(normalizeProvider("custom", "https://example.test/v1/").endpoint, "https://example.test/v1");
 });
 
-test("CLI presents provider selection before requesting a first API key", async () => {
+test("CLI asks whether to use Hugging Face or another provider before requesting an API key", async () => {
   const source = await readFile(path.join(root, "src", "tui", "start.js"), "utf8");
 
-  assert.match(source, /message: "Выберите AI-провайдера"/);
-  assert.match(source, /PROVIDER_PRESETS\.map/);
-  assert.match(source, /message: "Введите HTTPS endpoint OpenAI-совместимого API"/);
-  assert.match(source, /providerEndpoint: profile\.id === "custom" \? profile\.endpoint : ""/);
+  assert.match(source, /message: "Какой способ подключения использовать\?"/);
+  assert.match(source, /label: "Hugging Face"/);
+  assert.match(source, /label: "Другой OpenAI-совместимый провайдер"/);
+  assert.match(source, /message: "Введите Base URL OpenAI-совместимого API"/);
+  assert.match(source, /providerEndpoint: profile\.endpoint/);
 });

@@ -5,7 +5,7 @@ import { getStorageInfo, getProviderToken, saveProviderToken } from "../storage.
 import { verifyHuggingFaceToken } from "../agent.js";
 import { HuggingController } from "../controller.js";
 import { getConfig, updateConfig } from "../config.js";
-import { normalizeProvider, PROVIDER_PRESETS } from "../providers.js";
+import { normalizeProvider } from "../providers.js";
 import { formatUpdateNotice } from "../update-check.js";
 import { HuggingCodeApp } from "./App.js";
 
@@ -14,26 +14,28 @@ function cancelled(value) { if (p.isCancel(value)) { p.cancel("Сеанс зав
 
 async function chooseProvider(currentProfile) {
   const providerId = cancelled(await p.select({
-    message: "Выберите AI-провайдера",
-    initialValue: currentProfile.id,
-    options: PROVIDER_PRESETS.map((preset) => ({
-      value: preset.id,
-      label: preset.label,
-      hint: preset.id === "custom" ? "указать свой HTTPS endpoint" : preset.endpoint,
-    })),
+    message: "Какой способ подключения использовать?",
+    initialValue: currentProfile.id === "huggingface" ? "huggingface" : "custom",
+    options: [
+      { value: "huggingface", label: "Hugging Face", hint: "ввести токен Hugging Face (hf_...)" },
+      { value: "custom", label: "Другой OpenAI-совместимый провайдер", hint: "ввести Base URL и API key" },
+    ],
   }));
-  let endpoint = "";
-  if (providerId === "custom") {
-    endpoint = cancelled(await p.text({
-      message: "Введите HTTPS endpoint OpenAI-совместимого API",
-      placeholder: "https://api.example.com/v1",
-      validate(value) {
-        try { normalizeProvider("custom", value); return undefined; } catch (error) { return error.message; }
-      },
-    }));
+  if (providerId === "huggingface") {
+    const profile = normalizeProvider("huggingface");
+    await updateConfig({ provider: profile.id, providerEndpoint: "" });
+    return profile;
   }
-  const profile = normalizeProvider(providerId, endpoint);
-  await updateConfig({ provider: profile.id, providerEndpoint: profile.id === "custom" ? profile.endpoint : "" });
+  p.note("Примеры Base URL:\n• OpenAI: https://api.openai.com/v1\n• OpenRouter: https://openrouter.ai/api/v1\n• DeepSeek: https://api.deepseek.com/v1\n• Groq: https://api.groq.com/openai/v1\n• Together AI: https://api.together.xyz/v1", "Другой провайдер");
+  const endpoint = cancelled(await p.text({
+    message: "Введите Base URL OpenAI-совместимого API",
+    placeholder: "https://api.example.com/v1",
+    validate(value) {
+      try { normalizeProvider("custom", value); return undefined; } catch (error) { return error.message; }
+    },
+  }));
+  const profile = normalizeProvider("custom", endpoint);
+  await updateConfig({ provider: profile.id, providerEndpoint: profile.endpoint });
   return profile;
 }
 
