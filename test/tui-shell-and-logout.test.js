@@ -34,8 +34,11 @@ test("CLI opens a branded main menu immediately and supports a model shortcut fa
 
   assert.match(app, /const \[paletteOpen, setPaletteOpen\] = useState\(true\)/);
   assert.match(app, /value\.toLowerCase\(\) === "m" \|\| value\.toLowerCase\(\) === "o" \|\| key\.return/);
+  assert.match(app, /onOpenModel: \(\) => submit\("\/model"\)/);
   assert.match(palette, /Главное меню HuggingCode/);
   assert.match(palette, /Выберите действие для старта/);
+  assert.match(prompt, /if \(!value\.trim\(\)\) return onOpenModel\?\.\(\)/);
+  assert.match(prompt, /Enter отправить \/ пустой — модели/);
   assert.match(prompt, /Ctrl\+M\/Ctrl\+O модели/);
   assert.match(footer, /Ctrl\+M\/Ctrl\+O модели/);
 });

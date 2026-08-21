@@ -8,7 +8,7 @@ function printable(input, key) {
   return input && !key.ctrl && !key.meta && !key.escape && !key.return && !key.tab;
 }
 
-export function PromptInput({ value, onChange, onSubmit, disabled = false, pending = 0, history = [], theme, onCancel }) {
+export function PromptInput({ value, onChange, onSubmit, onOpenModel, disabled = false, pending = 0, history = [], theme, onCancel }) {
   const [suggestionIndex, setSuggestionIndex] = useState(0);
   const [historyIndex, setHistoryIndex] = useState(null);
   const draft = useRef("");
@@ -30,6 +30,7 @@ export function PromptInput({ value, onChange, onSubmit, disabled = false, pendi
     if (key.escape) return onCancel?.();
     if (key.return) {
       if (key.shift) return onChange(`${value}\n`);
+      if (!value.trim()) return onOpenModel?.();
       return submit();
     }
     if (suggestions.length && key.upArrow) return setSuggestionIndex((index) => Math.max(0, index - 1));
@@ -71,7 +72,7 @@ export function PromptInput({ value, onChange, onSubmit, disabled = false, pendi
     h(Box, { borderStyle: "round", borderColor: disabled ? theme.warning : theme.accent, paddingX: 1, flexDirection: "column" },
       h(Box, null,
         h(Text, { color: theme.accent, bold: true }, "❯ "),
-        h(Text, { color: value ? undefined : theme.muted }, value ? "" : "Опишите задачу, введите / для команд или Ctrl+P для палитры"),
+        h(Text, { color: value ? undefined : theme.muted }, value ? "" : "Опишите задачу, введите / для команд или Enter для выбора модели"),
         pending > 0 ? h(Text, { color: theme.info }, `  queue ${pending}`) : null,
       ),
       value ? h(Box, { flexDirection: "column", paddingLeft: 2 }, lines.map((line, index) => h(Text, { key: `${index}-${line}` }, index === lines.length - 1 ? `${line}▍` : line || " "))) : null,
@@ -83,7 +84,7 @@ export function PromptInput({ value, onChange, onSubmit, disabled = false, pendi
       )),
     ) : null,
     h(Box, { marginLeft: 1 },
-      h(Text, { dimColor: true }, "Enter отправить · Shift+Enter строка · ↑/↓ история · Tab дополнить · Ctrl+M/Ctrl+O модели · Ctrl+P меню · Esc отменить"),
+      h(Text, { dimColor: true }, "Enter отправить / пустой — модели · Shift+Enter строка · ↑/↓ история · Tab дополнить · Ctrl+M/Ctrl+O модели · Ctrl+P меню · Esc отменить"),
     ),
     disabled ? h(Text, { color: theme.warning }, "  Открыто окно выбора. Esc закрывает или отменяет его.") : null,
   );

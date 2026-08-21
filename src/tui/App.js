@@ -169,7 +169,7 @@ export function HuggingCodeApp({ controller }) {
     paletteOpen ? h(CommandPalette, { theme, onExecute: (command) => { setPaletteOpen(false); submit(command); }, onClose: () => setPaletteOpen(false) }) : null,
     fullModeRequest ? h(FullModeDialog, { phrase: fullModeRequest.phrase, workspace: fullModeRequest.workspace, theme, onConfirm: (phrase) => { if (controller.confirmFullMode(phrase)) setFullModeRequest(null); }, onCancel: () => { controller.cancelFullModeActivation(); setFullModeRequest(null); } }) : null,
     h(StatusBar, { status, theme }),
-    h(PromptInput, { value: input, onChange: setInput, onSubmit: submit, history, pending: queue.length, theme, onCancel: cancel, disabled: overlayOpen }),
+    h(PromptInput, { value: input, onChange: setInput, onSubmit: submit, onOpenModel: () => submit("/model"), history, pending: queue.length, theme, onCancel: cancel, disabled: overlayOpen }),
     h(FooterBar, { theme, columns: terminalColumns }),
   );
 }
