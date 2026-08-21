@@ -4,13 +4,38 @@ import * as p from "@clack/prompts";
 import { getStorageInfo, getProviderToken, saveProviderToken } from "../storage.js";
 import { verifyHuggingFaceToken } from "../agent.js";
 import { HuggingController } from "../controller.js";
-import { getConfig } from "../config.js";
-import { normalizeProvider } from "../providers.js";
+import { getConfig, updateConfig } from "../config.js";
+import { normalizeProvider, PROVIDER_PRESETS } from "../providers.js";
 import { formatUpdateNotice } from "../update-check.js";
 import { HuggingCodeApp } from "./App.js";
 
 const TOKEN_URL = "https://huggingface.co/settings/tokens/new?ownUserPermissions=inference.serverless.write&tokenType=fineGrained";
 function cancelled(value) { if (p.isCancel(value)) { p.cancel("Сеанс завершён."); process.exit(0); } return value; }
+
+async function chooseProvider(currentProfile) {
+  const providerId = cancelled(await p.select({
+    message: "Выберите AI-провайдера",
+    initialValue: currentProfile.id,
+    options: PROVIDER_PRESETS.map((preset) => ({
+      value: preset.id,
+      label: preset.label,
+      hint: preset.id === "custom" ? "указать свой HTTPS endpoint" : preset.endpoint,
+    })),
+  }));
+  let endpoint = "";
+  if (providerId === "custom") {
+    endpoint = cancelled(await p.text({
+      message: "Введите HTTPS endpoint OpenAI-совместимого API",
+      placeholder: "https://api.example.com/v1",
+      validate(value) {
+        try { normalizeProvider("custom", value); return undefined; } catch (error) { return error.message; }
+      },
+    }));
+  }
+  const profile = normalizeProvider(providerId, endpoint);
+  await updateConfig({ provider: profile.id, providerEndpoint: profile.id === "custom" ? profile.endpoint : "" });
+  return profile;
+}
 
 async function requestToken(profile) {
   p.intro(`HuggingCode — подключение ${profile.label}`);
@@ -37,8 +62,13 @@ async function requestToken(profile) {
 }
 
 export async function startInteractiveTui(options = {}) {
-  const config = await getConfig(); const profile = normalizeProvider(config.provider, config.providerEndpoint);
-  let token = await getProviderToken(profile.id); if (!token) token = await requestToken(profile);
+  const config = await getConfig(); let profile = normalizeProvider(config.provider, config.providerEndpoint);
+  let token = await getProviderToken(profile.id);
+  if (!token) {
+    profile = await chooseProvider(profile);
+    token = await getProviderToken(profile.id);
+    if (!token) token = await requestToken(profile);
+  }
   const controller = await HuggingController.create({ token, workspaceRoot: options.workspaceRoot || process.cwd(), provider: profile.id, providerEndpoint: profile.endpoint });
   await controller.initialize(); const app = render(h(HuggingCodeApp, { controller }), { exitOnCtrlC: false });
   if (options.updateCheck) void Promise.resolve(options.updateCheck).then((update) => { const content = formatUpdateNotice(update); if (content) controller.emit({ type: "notice", level: "info", content }); });
