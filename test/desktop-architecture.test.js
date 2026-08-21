@@ -71,10 +71,11 @@ test("desktop trajectory renderer exposes observed events but has no raw thinkin
 });
 
 
-test("desktop settings expose searchable full catalog, providers and token economy", async () => {
+test("desktop settings expose searchable provider catalogs, providers and token economy", async () => {
   const renderer = await text("desktop/renderer/renderer.js");
   const bridge = await text("desktop/tauri-bridge.js");
-  assert.match(renderer, /Поиск по полному каталогу моделей Hugging Face/);
+  assert.match(renderer, /Поиск по каталогу моделей выбранного провайдера/);
+  assert.match(renderer, /Live каталог выбранного провайдера/);
   assert.match(renderer, /bridge\.settings\(\{ query: modelSearch\.value/);
   assert.match(renderer, /connectProvider/);
   assert.match(renderer, /selectTokenMode/);

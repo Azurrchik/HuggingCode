@@ -86,6 +86,20 @@ export async function fetchModelCatalog(token, { signal } = {}) {
   return catalog;
 }
 
+export async function fetchProviderModelCatalog(provider, token, { signal, fetchImpl = fetch } = {}) {
+  const endpoint = String(provider?.endpoint || "").trim().replace(/\/+$/, "");
+  if (!/^https:\/\//i.test(endpoint)) throw new Error("Для загрузки моделей укажите HTTPS Base URL провайдера.");
+  const response = await fetchImpl(`${endpoint}/models`, { headers: { Authorization: `Bearer ${token}` }, signal });
+  if (!response.ok) throw new Error(`Не удалось загрузить модели провайдера: HTTP ${response.status}.`);
+  const catalog = catalogFromPayload(await response.json()).map((model) => ({
+    ...model,
+    provider: model.provider === "auto" ? provider?.label || "custom" : model.provider,
+    description: model.description === "Hugging Face Inference Providers model" ? "Модель OpenAI-совместимого провайдера" : model.description,
+  }));
+  if (!catalog.length) throw new Error("Провайдер вернул пустой каталог моделей.");
+  return catalog;
+}
+
 export function searchModels(catalog, query = "", filters = {}) {
   const needle = query.trim().toLowerCase();
   return catalog.filter((model) => {

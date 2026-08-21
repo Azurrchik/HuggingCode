@@ -11,7 +11,8 @@ import { TaskManager } from "./tasks.js";
 import { createWorkspace } from "./workspace.js";
 import { CheckpointStore } from "./checkpoints.js";
 import { detectProjectChecks } from "./verification.js";
-import { fallbackCatalog, fetchModelCatalog, formatModelSelection, searchModels } from "./model-catalog.js";
+import { fallbackCatalog, fetchModelCatalog, fetchProviderModelCatalog, formatModelSelection, searchModels } from "./model-catalog.js";
+import { normalizeProvider } from "./providers.js";
 import { formatHelp } from "./command-catalog.js";
 import { normalizeTheme } from "./tui/theme.js";
 
@@ -91,9 +92,16 @@ export class HuggingController {
 
   async refreshModelCatalog({ silent = false } = {}) {
     if (this.config.provider !== "huggingface") {
-      this.modelCatalog = [];
-      this.modelCatalogSource = "provider";
-      if (!silent) this.emit({ type: "notice", level: "info", content: `Для ${this.config.provider} укажите ID модели вручную или выберите его из каталога провайдера.` });
+      const provider = normalizeProvider(this.config.provider, this.config.providerEndpoint);
+      try {
+        this.modelCatalog = await fetchProviderModelCatalog(provider, this.token);
+        this.modelCatalogSource = "provider";
+        if (!silent) this.emit({ type: "notice", level: "info", content: `Загружен каталог ${provider.label}: ${this.modelCatalog.length} моделей.` });
+      } catch (error) {
+        this.modelCatalog = [];
+        this.modelCatalogSource = "provider-unavailable";
+        if (!silent) this.emit({ type: "notice", level: "warn", content: `Не удалось загрузить каталог ${provider.label}; ID модели можно ввести вручную (${error.message}).` });
+      }
       return this.modelCatalog;
     }
     try {
@@ -473,7 +481,7 @@ export class HuggingController {
       }
       case "models": {
         await this.refreshModelCatalog();
-        const models = this.getModelCatalog(arg, { code: true }).slice(0, 20);
+        const models = this.getModelCatalog(arg, { code: this.config.provider === "huggingface" }).slice(0, 20);
         this.emit({ type: "assistant_final", turnId: this.currentTurn?.id, content: models.map((model) => `${model.id}\n${model.label} · ${model.tags.join(", ") || "chat"}${model.contextLength ? ` · ctx ${model.contextLength.toLocaleString()}` : ""}`).join("\n\n") || "Модели не найдены." });
         return;
       }

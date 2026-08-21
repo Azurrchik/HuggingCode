@@ -15,7 +15,7 @@ export function ModelPicker({ models, source, currentModel, theme, onSelect, onC
   const [query, setQuery] = useState("");
   const [index, setIndex] = useState(0);
   const [policyIndex, setPolicyIndex] = useState(0);
-  const [filters, setFilters] = useState({ code: true, tools: false, vision: false });
+  const [filters, setFilters] = useState({ code: source === "live" || source === "fallback", tools: false, vision: false });
   const visible = useMemo(() => searchModels(models, query, filters).slice(0, 12), [models, query, filters]);
   const selected = visible[Math.min(index, Math.max(0, visible.length - 1))] || null;
   const policy = MODEL_POLICIES[policyIndex];
@@ -37,10 +37,13 @@ export function ModelPicker({ models, source, currentModel, theme, onSelect, onC
     else if (query.trim()) onSelect(query.trim(), policy);
   };
 
+  const providerCatalog = source === "provider";
+  const title = source === "live" ? "Выбор модели Hugging Face" : providerCatalog ? "Выбор модели провайдера" : "Выбор модели";
+  const sourceLabel = source === "live" ? "живой каталог Hugging Face" : providerCatalog ? "живой каталог провайдера" : source === "provider-unavailable" ? "каталог недоступен" : "офлайн fallback";
   return h(Box, { borderStyle: "double", borderColor: theme.accent, flexDirection: "column", paddingX: 1, marginX: 1 },
     h(Box, { justifyContent: "space-between" },
-      h(Text, { color: theme.accent, bold: true }, "Выбор модели Hugging Face"),
-      h(Text, { dimColor: true }, `${source === "live" ? "живой каталог" : "офлайн fallback"} · моделей: ${models.length}`),
+      h(Text, { color: theme.accent, bold: true }, title),
+      h(Text, { dimColor: true }, `${sourceLabel} · моделей: ${models.length}`),
     ),
     h(Box, { borderStyle: "round", borderColor: theme.border, paddingX: 1, marginTop: 1 },
       h(Text, { color: theme.muted }, "Поиск  "),
